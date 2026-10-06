@@ -1,0 +1,20 @@
+{
+  "Counterparty": {
+    "Name": "ООО Ромашка",
+    "VatIn": "7701234567",
+    "Kpp": "770101001",
+    "Address": "123456, г. Москва, ул. Примерная, д. 10",
+    "Contact": "Иван Петров",
+    "Email": "contracts@example.com"
+  },
+  "Contracts": [
+    { "Number": "Д-001/2026", "Date": "2026-01-15", "Name": "Поставка оборудования", "Amount": 50000.00, "Currency": "RUB" },
+    { "Number": "Д-002/2026", "Date": "2026-03-10", "Name": "Техническое обслуживание", "Amount": 65430.50, "Currency": "RUB" },
+    { "Number": "Д-003/2026", "Date": "2026-06-01", "Name": "Консультационные услуги", "Amount": 10000.00, "Currency": "RUB" }
+  ],
+  "Totals": {
+    "Count": 3,
+    "Amount": 125430.50,
+    "Currency": "RUB"
+  }
+}

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/SolutionItems/">
+    <File Path="AGENTS.md" />
+    <File Path="README.md" />
+    <File Path="SPEC.md" />
+  </Folder>
+  <Project Path="Monoreport.Cli/Monoreport.Cli.csproj" />
+  <Project Path="Monoreport.Tests/Monoreport.Tests.csproj" />
+  <Project Path="Monoreport/Monoreport.csproj" />
+</Solution>

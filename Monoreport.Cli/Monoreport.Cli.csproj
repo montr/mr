@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Monoreport.Cli</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Monoreport/Monoreport.csproj" />
+    <None Update="sample.template.docx" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="sample.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Monoreport.Tests" />
+  </ItemGroup>
+</Project>
