@@ -13,9 +13,9 @@
 
 5. After implementation, the Reviewer independently verifies conformance with the Feature Spec, architecture, plan, and code and test quality. Blocking findings go back to the Developer for correction and subsequent re-review. Feature completion requires verified checks and explicit acceptance by the Product Owner.
 
-6. Store feature documents in `.docs/features/<NNN>-<slug>/`, using sequential IDs `001`, `002`, `003`, and so on. Maintain a `feature-status.json` for every feature, recording the current phase, approvals, verification results, and next action. When resuming work, reconcile the recorded status with actual files and Git state rather than relying on JSON alone.
+6. Store feature documents in `.docs/features/<NNN>-<slug>/`, using sequential, never-reused IDs `001`, `002`, `003`, and so on. Maintain a `feature-status.json` for every feature containing only the `phase` property, with one of `discussion`, `planning`, `implementation`, `review`, `acceptance`, or `completed`. The Orchestrator owns phase transitions. Record approvals, review outcomes, and verification evidence in the relevant feature documents. When resuming work, reconcile the recorded status with actual files and Git state rather than relying on JSON alone.
 
-7. Register the original specification and existing implementation as Feature `001`. First audit the implementation against the requirements and tests. Do not mark this feature complete without verification and Product Owner acceptance.
+7. Register the original specification and existing implementation as Feature `001`. Register the existing implementation as version `0.0.1` in phase `review`, preserving the original specification at `.docs/features/001-initial-implementation/feature-spec.md`. Do not create a retroactive implementation plan or imply prior approval. Perform the retrospective audit against requirements and tests only when explicitly requested. Do not mark this feature complete without verification and Product Owner acceptance.
 
 8. Material changes to requirements, architecture, scope, workflow order, or approval gates require explicit Product Owner approval. Do not bypass the workflow or modify its controlling Skills without approval.
 

@@ -51,20 +51,72 @@ namespace Monoreport.Tests.Services
                         Docx.AssertValid(bytes);
                         var xml = Docx.Read(bytes);
                         var text = Docx.Text(xml);
-                        Assert.Contains("ООО Ромашка", text);
+                        Assert.Contains("Northwind Construction LLC", text);
                         Assert.Contains("7701234567", text);
-                        Assert.Contains("Д-001/2026", text);
-                        Assert.Contains("15.01.2026", text);
-                        Assert.Contains("Консультационные услуги", text);
-                        Assert.Contains("Всего договоров: 3", text);
+                        Assert.Contains("MAT-001/2026", text);
+                        Assert.Contains("15 Jan 2026", text);
+                        Assert.Contains("Washed building sand", text);
+                        Assert.Contains("Material items: 3", text);
                         Assert.Contains("125,430.50", text);
                         Assert.Contains(ExpectedAmountInWords, text);
                         Assert.Equal(4, xml.Descendants(WordXml.TableRowElementName).Count());
                         Assert.DoesNotContain("TableStart:", xml.ToString());
-                        Assert.NotEmpty(xml.Descendants(WordXml.SimpleFieldElementName));
+                        AssertSample(bytes);
                     }
                 }
             }
+        }
+
+
+        [Fact]
+        public void Committed_sample_is_valid_and_preserves_fields_and_formatting()
+        {
+            AssertSample(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "sample.docx")));
+        }
+
+        private static void AssertSample(byte[] bytes)
+        {
+            Docx.AssertValid(bytes);
+            var xml = Docx.Read(bytes);
+            var text = Docx.Text(xml);
+            Assert.Contains("Construction Project Cost Estimate", text);
+            Assert.Contains("Riverside Community Centre", text);
+            Assert.Contains("Northwind Construction LLC", text);
+            Assert.Contains("1167746123456", text);
+            Assert.Contains("James Carter", text);
+            Assert.Contains("Portland cement (25 kg bag)", text);
+            Assert.Contains("Concrete paving slabs (600 x 600 x 50 mm)", text);
+            Assert.Contains("Washed building sand", text);
+            Assert.Contains("1,308.61", text);
+            Assert.Contains("65,430.50", text);
+            Assert.Contains("125,430.50", text);
+            Assert.Contains(ExpectedAmountInWords, text);
+            var w = WordXml.TableRowElementName.Namespace;
+            var rows = xml.Descendants(w + "tr").ToArray();
+            Assert.Equal(4, rows.Length);
+            Assert.All(rows, row => Assert.Equal(8, row.Elements(w + "tc").Count()));
+            Assert.Equal(new[] { "Reference", "Delivery date", "Material", "Quantity", "Unit", "Unit price", "Line total", "Currency" },
+                rows[0].Elements(w + "tc").Select(Docx.Text));
+            Assert.Equal(new[] { "MAT-001/2026", "15 Jan 2026", "Portland cement (25 kg bag)", "100", "bags", "500.00", "50,000.00", "RUB" },
+                rows[1].Elements(w + "tc").Select(Docx.Text));
+            Assert.Single(xml.Descendants(w + "tblHeader"));
+            Assert.Equal(8, rows[0].Descendants(w + "shd").Count());
+            Assert.All(rows[0].Descendants(w + "shd"), shade => Assert.Equal("D9E5F2", (string?)shade.Attribute(w + "fill")));
+            Assert.NotEmpty(xml.Descendants(w + "b"));
+            Assert.Contains(xml.Descendants(w + "sz"), size => (string?)size.Attribute(w + "val") == "32");
+            Assert.NotEmpty(xml.Descendants(w + "tblBorders"));
+            Assert.Single(xml.Descendants(w + "sectPr"));
+            var fields = xml.Descendants(WordXml.SimpleFieldElementName)
+                .Select(field => (string?)field.Attribute(w + "instr") ?? string.Empty).ToArray();
+            Assert.Equal(35, fields.Length);
+            Assert.Contains(fields, field => field.Contains("Contractor.TaxId"));
+            Assert.Contains(fields, field => field.Contains("Project.Name"));
+            Assert.Equal(3, fields.Count(field => field.Contains("DeliveryDate") && field.Contains("dd MMM yyyy")));
+            Assert.Equal(3, fields.Count(field => field.Contains("UnitPrice") && field.Contains("\\#")));
+            Assert.Contains(fields, field => field.Contains("Totals.Amount") && field.Contains("SpellOut"));
+            Assert.DoesNotContain("TableStart:", xml.ToString());
+            Assert.DoesNotContain("TableEnd:", xml.ToString());
+            Assert.DoesNotContain("«", text);
         }
 
         [Fact]

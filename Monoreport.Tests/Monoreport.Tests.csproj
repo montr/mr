@@ -24,7 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="../Monoreport.Cli/sample.template.docx" Link="sample.template.docx" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../Monoreport.Cli/sample.json" Link="sample.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../Samples/sample.template.docx" Link="sample.template.docx" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../Samples/sample.json" Link="sample.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../Samples/sample.docx" Link="sample.docx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

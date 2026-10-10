@@ -2,7 +2,7 @@
   <Folder Name="/SolutionItems/">
     <File Path="AGENTS.md" />
     <File Path="README.md" />
-    <File Path="SPEC.md" />
+    <File Path=".docs/features/001-initial-implementation/feature-spec.md" />
   </Folder>
   <Project Path="Monoreport.Cli/Monoreport.Cli.csproj" />
   <Project Path="Monoreport.Tests/Monoreport.Tests.csproj" />

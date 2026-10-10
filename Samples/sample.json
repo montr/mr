@@ -1,0 +1,50 @@
+{
+  "Contractor": {
+    "Name": "Northwind Construction LLC",
+    "TaxId": "7701234567",
+    "RegistrationNumber": "1167746123456",
+    "Address": "24 Leninsky Avenue, Moscow 119071, Russia",
+    "Contact": "James Carter",
+    "Email": "estimates@northwind.example"
+  },
+  "Project": {
+    "Name": "Riverside Community Centre, Moscow"
+  },
+  "Materials": [
+    {
+      "Reference": "MAT-001/2026",
+      "DeliveryDate": "2026-01-15",
+      "Description": "Portland cement (25 kg bag)",
+      "Quantity": 100,
+      "Unit": "bags",
+      "UnitPrice": 500.0,
+      "LineTotal": 50000.0,
+      "Currency": "RUB"
+    },
+    {
+      "Reference": "MAT-002/2026",
+      "DeliveryDate": "2026-03-10",
+      "Description": "Concrete paving slabs (600 x 600 x 50 mm)",
+      "Quantity": 50,
+      "Unit": "slabs",
+      "UnitPrice": 1308.61,
+      "LineTotal": 65430.5,
+      "Currency": "RUB"
+    },
+    {
+      "Reference": "MAT-003/2026",
+      "DeliveryDate": "2026-06-01",
+      "Description": "Washed building sand",
+      "Quantity": 5,
+      "Unit": "tonnes",
+      "UnitPrice": 2000.0,
+      "LineTotal": 10000.0,
+      "Currency": "RUB"
+    }
+  ],
+  "Totals": {
+    "Count": 3,
+    "Amount": 125430.5,
+    "Currency": "RUB"
+  }
+}

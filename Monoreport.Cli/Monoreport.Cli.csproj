@@ -6,8 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Monoreport/Monoreport.csproj" />
-    <None Update="sample.template.docx" CopyToOutputDirectory="PreserveNewest" />
-    <None Update="sample.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Monoreport.Tests" />
