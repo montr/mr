@@ -1,16 +1,16 @@
-# Monoreport — DOCX Template Merge Engine
+# MonoReport — DOCX Template Merge Engine
 
 Projects targeting **.NET 10 / C# 14**:
 
-1. `Monoreport` — an engine built on Open XML SDK 3.5.1, with the `Monoreport.Services` and `Monoreport.Models` namespaces.
-2. `Monoreport.Tests` — automated xUnit tests, including output validation with `OpenXmlValidator`.
-3. `Monoreport.Cli` — a console application that generates DOCX documents from a template and JSON.
+1. `MonoReport` — an engine built on Open XML SDK 3.5.1, with the `MonoReport.Services` and `MonoReport.Models` namespaces.
+2. `MonoReport.Tests` — automated xUnit tests, including output validation with `OpenXmlValidator`.
+3. `MonoReport.Cli` — a console application that generates DOCX documents from a template and JSON.
 
 .NET SDK 10 is required. Microsoft Word does not need to be installed.
 
 ```powershell
-dotnet build Monoreport.slnx -c Release
-dotnet test Monoreport.slnx -c Release
+dotnet build MonoReport.slnx -c Release
+dotnet test MonoReport.slnx -c Release
 ```
 
 `NuGet.Config` uses only the official HTTPS nuget.org source.
@@ -19,8 +19,8 @@ dotnet test Monoreport.slnx -c Release
 
 ```csharp
 using System.Text.Json;
-using Monoreport.Services;
-using Monoreport.Models;
+using MonoReport.Services;
+using MonoReport.Models;
 
 using var template = File.OpenRead("template.docx");
 using var data = JsonDocument.Parse("""
@@ -110,7 +110,7 @@ An amount in words can be requested directly in the field code:
 { MERGEFIELD Totals.Amount \* SpellOut \* MERGEFORMAT }
 ```
 
-In Word, insert a MERGEFIELD, display its code with Shift+F9, and add `\* SpellOut` after the field name. No tags or additional CLI options are needed. `SpellOut` is a Monoreport extension rather than a built-in Word formatter: Monoreport computes its result when run. The formatter name is case-insensitive. A field using the same JSON path without `SpellOut` continues to display a number; field codes and formatting remain intact after a merge.
+In Word, insert a MERGEFIELD, display its code with Shift+F9, and add `\* SpellOut` after the field name. No tags or additional CLI options are needed. `SpellOut` is a MonoReport extension rather than a built-in Word formatter: MonoReport computes its result when run. The formatter name is case-insensitive. A field using the same JSON path without `SpellOut` continues to display a number; field codes and formatting remain intact after a merge.
 
 Formatters can also be bound programmatically through the API:
 
@@ -146,9 +146,9 @@ Tests cover fields, all listed switches, split instructions, formatting preserva
 
 Parsing, formatting, and writing services are instances with constructor-injected dependencies. The consuming application composes the service graph and supplies it through public constructors. `MergeEngine` has no parameterless constructor. The registry receives formatters externally. Data context and warnings are created separately for each Merge call.
 
-## Monoreport.Cli — console application
+## MonoReport.Cli — console application
 
-The application references the `Monoreport` project. It accepts a DOCX template path, a JSON source, and an optional output path. The CLI entry point composes engine services and supplies dependencies through constructors.
+The application references the `MonoReport` project. It accepts a DOCX template path, a JSON source, and an optional output path. The CLI entry point composes engine services and supplies dependencies through constructors.
 
 1. `--template <path>` / `-t <path>` — required template path.
 2. `--output <path>` / `-o <path>` — output path; an existing file is overwritten after a successful merge. If omitted or set to `-`, DOCX is written to stdout as binary data.
@@ -168,27 +168,27 @@ The example estimates materials for the Riverside Community Centre in Moscow, su
 Run these commands from the repository root. The source template is `sample.template.docx`, and the generated document is `sample.docx`:
 
 ```powershell
-dotnet build Monoreport.Cli/Monoreport.Cli.csproj -c Release
-dotnet Monoreport.Cli/bin/Release/net10.0/Monoreport.Cli.dll --template Samples/sample.template.docx --json-file Samples/sample.json --output Samples/sample.docx --culture en-GB
+dotnet build MonoReport.Cli/MonoReport.Cli.csproj -c Release
+dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll --template Samples/sample.template.docx --json-file Samples/sample.json --output Samples/sample.docx --culture en-GB
 ```
 
 Read JSON from stdin in PowerShell and write the result to a file:
 
 ```powershell
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-Get-Content -Raw -Encoding UTF8 Samples/sample.json | dotnet Monoreport.Cli/bin/Release/net10.0/Monoreport.Cli.dll --template Samples/sample.template.docx --stdin --output Samples/sample.docx --culture en-GB
+Get-Content -Raw -Encoding UTF8 Samples/sample.json | dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll --template Samples/sample.template.docx --stdin --output Samples/sample.docx --culture en-GB
 ```
 
 Pass JSON as a Bash argument:
 
 ```bash
-dotnet Monoreport.Cli/bin/Release/net10.0/Monoreport.Cli.dll --template Samples/sample.template.docx --json "$(cat Samples/sample.json)" --output Samples/sample.docx --culture en-GB
+dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll --template Samples/sample.template.docx --json "$(cat Samples/sample.json)" --output Samples/sample.docx --culture en-GB
 ```
 
 Read stdin and redirect binary stdout in Bash or `cmd.exe`:
 
 ```text
-dotnet Monoreport.Cli/bin/Release/net10.0/Monoreport.Cli.dll --template Samples/sample.template.docx --culture en-GB < Samples/sample.json > Samples/sample.docx
+dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll --template Samples/sample.template.docx --culture en-GB < Samples/sample.json > Samples/sample.docx
 ```
 
 For stdout, invoke the already-built DLL so that `dotnet run` build messages cannot enter the DOCX output. In Windows PowerShell 5.1, use `--output` because its text redirection with `>` is unsuitable for binary DOCX. With `--stdin` and no redirection, the application waits for JSON and the end of input (EOF).

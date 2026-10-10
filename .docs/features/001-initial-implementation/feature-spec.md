@@ -254,7 +254,7 @@ Use an engine extension for spelling out monetary amounts:
 { MERGEFIELD Totals.Amount \* SpellOut }
 ```
 
-`SpellOut` is specified directly in the field code and handled by the Monoreport engine through a custom formatter. It is an engine extension, not built-in Word formatting. No content control tags or formatter parameters in the CLI are required. A field with the same path without this switch is rendered normally. The field code, including `SpellOut`, is preserved during merging.
+`SpellOut` is specified directly in the field code and handled by the MonoReport engine through a custom formatter. It is an engine extension, not built-in Word formatting. No content control tags or formatter parameters in the CLI are required. A field with the same path without this switch is rendered normally. The field code, including `SpellOut`, is preserved during merging.
 
 ---
 
@@ -950,7 +950,7 @@ Implement:
 122. currency;
 123. Additional formatters.
 
-For monetary amounts in words, use the agreed `\* SpellOut` syntax handled by the Monoreport engine. Introduce other extensions only with explicit agreement.
+For monetary amounts in words, use the agreed `\* SpellOut` syntax handled by the MonoReport engine. Introduce other extensions only with explicit agreement.
 
 ---
 
