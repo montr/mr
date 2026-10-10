@@ -1,31 +1,42 @@
-# Правила работы с проектом
 
-## Правила форматирования C#
+# Project Rules
 
-1. Во всех C#-файлах проекта, включая тесты, используйте только block-scoped пространства имён: `namespace Name { ... }`. File-scoped объявления (`namespace Name;`) запрещены. Правило применяется и к новым файлам, и к изменениям существующих файлов. Используйте отступ в четыре пробела внутри каждого блока.
+## Feature Workflow
 
-2. Отделяйте методы и конструкторы друг от друга и от соседних членов типа пустой строкой. Правило относится также к методам и конструкторам с expression-bodied реализацией.
+1. For developing or modifying functionality, follow the mandatory workflow defined in `.agents/skills/feature-orchestrator/SKILL.md`. The Orchestrator coordinates work and delegates to `feature-architect`, `feature-developer`, and `feature-reviewer`. Do not substitute the Developer's self-review for independent review.
 
-3. После закрывающей фигурной скобки завершённого блока добавляйте пустую строку перед следующим самостоятельным оператором или членом типа. Не добавляйте пустую строку между связанными частями `if`/`else`, `try`/`catch`/`finally` и `do`/`while`, а также перед закрывающей скобкой внешнего блока.
+2. Start each new feature with a discussion of requirements and architectural decisions between the Product Owner and Architect. The Architect prepares `feature-spec.md`. Implementation must not begin until the Product Owner explicitly approves the specification.
 
-4. Используйте фигурные скобки для тел `if`/`else`, циклов (`for`, `foreach`, `while`, `do`), `using`, `lock` и других конструкций с телом. Скобки можно опустить только у однострочного `if` без `else`, когда условие и оператор находятся на одной строке. Для освобождения ресурсов используйте `using (...) { ... }` вместо `using var`. В цепочках `else if` каждое тело должно быть заключено в скобки.
+3. After specification approval, the Developer prepares `implementation-plan.md`, including implementation steps, verification criteria, and an automated test plan. The Reviewer independently reviews the plan. Implementation may begin only after blocking findings are resolved and the Product Owner explicitly approves the plan.
 
-5. Отделяйте свойства друг от друга и от соседних членов типа пустой строкой, как методы. Правило относится к автосвойствам и свойствам с expression-bodied реализацией, включая свойства в record-типах.
+4. The Developer implements the approved plan with mandatory automated tests. Prefer the TDD cycle (Red–Green–Refactor) where practical. For bug fixes, first add a regression test that reproduces the defect. Never report a check as passed unless it was actually run.
 
-6. Не используйте магические строковые литералы для технических имён, ключей и служебных значений. Объявляйте именованные константы в ответственном за них типе и используйте их в основном коде и тестах. Имена элементов и атрибутов OOXML, пространства имён и служебные XML-значения храните в WordXml; для XML-имён используйте XName. Коды Word-полей и их переключатели храните в WordFieldCodes, ключи собственных форматтеров — в соответствующих форматтерах.
+5. After implementation, the Reviewer independently verifies conformance with the Feature Spec, architecture, plan, and code and test quality. Blocking findings go back to the Developer for correction and subsequent re-review. Feature completion requires verified checks and explicit acceptance by the Product Owner.
 
-7. Перед `try` добавляйте пустую строку, если перед ним в текущем блоке есть код. Если `try` — первый оператор блока, пустая строка после открывающей скобки не нужна.
+6. Store feature documents in `.docs/features/<NNN>-<slug>/`, using sequential IDs `001`, `002`, `003`, and so on. Maintain a `feature-status.json` for every feature, recording the current phase, approvals, verification results, and next action. When resuming work, reconcile the recorded status with actual files and Git state rather than relying on JSON alone.
 
-8. Для отрицания булевых выражений используйте явное сравнение с `false` вместо префиксного оператора `!`. Правило применяется в основном коде и тестах, включая условия и возвращаемые выражения. Операторы `!=` и подавления nullable-предупреждений (постфиксный `!`) к этому правилу не относятся.
+7. Register the original specification and existing implementation as Feature `001`. First audit the implementation against the requirements and tests. Do not mark this feature complete without verification and Product Owner acceptance.
 
-9. Сервисы реализуйте как экземпляры классов; зависимости от других сервисов передавайте через конструктор. Не используйте публичные или internal статические методы сервисов. Статическими могут быть приватные вспомогательные методы; классы с константами не должны содержать сервисную логику. Сервисы не должны создавать свои сервисы-зависимости ни в конструкторах, ни в методах, ни в инициализаторах полей. Не добавляйте конструкторы без параметров, которые подставляют зависимости по умолчанию. Все сервисные зависимости должны приходить снаружи через конструктор; сборка графа выполняется в вызывающем приложении или тестах. Данные отдельного вызова храните в отдельном контексте, а не в состоянии переиспользуемого сервиса.
+8. Material changes to requirements, architecture, scope, workflow order, or approval gates require explicit Product Owner approval. Do not bypass the workflow or modify its controlling Skills without approval.
 
-10. При присваивании ссылочного аргумента объединяйте проверку на null и присваивание в одну строку с помощью оператора `??` и выражения `throw new ArgumentNullException(nameof(...))`. Не выполняйте отдельный вызов `ArgumentNullException.ThrowIfNull` перед таким присваиванием. Для самостоятельной проверки аргумента без присваивания отдельный вызов допустим.
+9. Do not push, merge, publish releases, or delete branches without explicit Product Owner permission. Preserve existing uncommitted changes.
 
-11. Где возможно, используйте primary constructors вместо обычных конструкторов. Инициализируйте поля и свойства из их параметров, сохраняя проверки на null через `?? throw` и получение сервисных зависимостей снаружи. Обычный конструктор оставляйте только там, где необходимую логику нельзя корректно выразить через primary constructor и инициализаторы.
+10. A shortened workflow for minor technical tasks is allowed only with Product Owner approval. Required checks and tests for affected behavior still apply.
 
-## Правила документации
+## Coding Guidelines
 
-1. Во всей документации и её изменениях используйте нумерованные списки вместо маркированных, чтобы на пункты можно было ссылаться по номеру. Записывайте явные последовательные номера пунктов; не используйте повторяющийся маркер `1.` для всех пунктов. Сохраняйте однозначность ссылок на пункты внутри документа.
+1. Implement services as class instances. Inject dependencies on other services through constructors. Do not use public or internal static service methods. Private static helper methods are allowed, but classes containing constants must not contain service logic.
 
-2. Не добавляйте в документацию примеры форматирования кода без явного запроса пользователя.
+2. Services must not instantiate their own service dependencies in constructors, methods, or field initializers. Do not introduce parameterless constructors that provide default dependencies. All service dependencies must be supplied externally through constructors. The dependency graph must be composed by the consuming application or tests.
+
+3. Store per-operation data in a separate context rather than in the state of a reusable service.
+
+4. Prefer primary constructors where possible. Initialize fields and properties from their parameters, preserving null validation with `?? throw` and external dependency injection. Use regular constructors only when the required logic cannot be correctly expressed using primary constructors and initializers.
+
+## Documentation Rules
+
+1. Write all project rules, Skills, specifications, plans, architecture decisions, and other project documentation in English. This does not restrict the language used in discussions with the Product Owner.
+
+2. Use numbered lists instead of bullet lists in all documentation and documentation changes so that items can be referenced by number. Number items explicitly and sequentially; do not repeat `1.` for every item. Keep references to numbered items unambiguous within each document.
+
+3. Do not add code-formatting examples to documentation unless explicitly requested by the Product Owner.
