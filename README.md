@@ -97,6 +97,11 @@ The region is copied for each item. An empty array produces no data rows, while 
 
 Region boundaries must be in rows of the same table or in paragraphs sharing a parent. Both markers can also appear in a single data row, surrounding its fields. Arbitrary ranges across different tables or document parts are not supported. Use separate boundary rows or paragraphs for nested regions.
 
+1. Independent regions must use separate paragraph or table-row ranges with no shared boundary block. Shared or overlapping block footprints, including containment through nested tables, are rejected; genuine logical parent/child regions remain supported.
+2. Nested Word fields inside an ordinary or technical-marker `MERGEFIELD` cached result are unsupported. Move the nested field outside the outer result or replace that result with plain cached text. Instruction nesting and independent sibling Word fields retain their existing behavior.
+3. The engine validates these structures in every processed story part before changing any story. A `TemplateException` identifies the field or conflicting collections, original part URI, paragraph/table-row context when available, and the required template correction. CLI rejection emits a diagnostic without producing DOCX output or replacing an existing output file.
+
+
 Within a region, paths resolve strictly relative to the current item: use `Name`, rather than `Items.Name`. There is no implicit lookup in the parent object. Nested `Orders → Items` collections are supported through a context stack; finishing the inner region restores the order context, and finishing the outer region restores the root object.
 
 **Expanding collections again:** use the original template. Marker fields are removed after a merge, as required by the specification; the result does not retain the original region or each row's array-index binding. Merging a generated document again supports ordinary fields but does not reconstruct collection structure.

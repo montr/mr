@@ -29,6 +29,7 @@ namespace MonoReport.Services
                 using (var document = WordprocessingDocument.Open(output, true))
                 {
                     var main = document.MainDocumentPart ?? throw new TemplateException("DOCX has no main document part.");
+                    var stories = new List<(OpenXmlPart Part, XDocument Xml)>();
                     foreach (var part in StoryParts(main))
                     {
                         XDocument xml;
@@ -40,6 +41,14 @@ namespace MonoReport.Services
                             }
                         }
 
+                        stories.Add((part, xml));
+                    }
+
+                    foreach (var (part, xml) in stories)
+                        _renderer.Preflight(xml.Root!, part.Uri.ToString());
+
+                    foreach (var (part, xml) in stories)
+                    {
                         _renderer.Render(xml.Root!, part.Uri.ToString(), context);
                         using (var target = part.GetStream(FileMode.Create, FileAccess.Write))
                         {

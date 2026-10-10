@@ -11,6 +11,75 @@ namespace MonoReport.Tests.Services
         private const string ExpectedAmountInWords = "Сто двадцать пять тысяч четыреста тридцать рублей 50 копеек";
 
         [Theory]
+        [InlineData(true, "stdout")]
+        [InlineData(false, "stdout")]
+        [InlineData(true, "new")]
+        [InlineData(false, "new")]
+        [InlineData(true, "existing")]
+        [InlineData(false, "existing")]
+        public void Invalid_template_rejection_preserves_streams_and_output_files(bool nested, string mode)
+        {
+            var template = nested ? Docx.Create(Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE"))) : Docx.Create(RegionTests.ConflictingLayout("paragraph"));
+            Docx.AssertValid(template);
+            var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(directory);
+            var templatePath = Path.Combine(directory, "invalid.docx");
+            var outputPath = Path.Combine(directory, "output.docx");
+            var sentinel = Encoding.UTF8.GetBytes("existing output sentinel");
+            File.WriteAllBytes(templatePath, template);
+            if (mode == "existing") File.WriteAllBytes(outputPath, sentinel);
+            try
+            {
+                var args = new List<string> { CliArguments.Template, templatePath, CliArguments.Json, "{\"Name\":\"replacement\",\"A\":[{}],\"B\":[{}]}" };
+                if (mode != "stdout") args.AddRange(new[] { CliArguments.Output, outputPath });
+                var app = new CliApplication(new CliOptionsParser(), Docx.CreateEngine());
+                using var output = new MemoryStream();
+                using var errors = new StringWriter();
+                Assert.Equal(1, app.Run(args.ToArray(), Stream.Null, output, errors));
+                Assert.Empty(output.ToArray());
+                Assert.True(output.CanWrite);
+                Assert.Contains("/word/document.xml", errors.ToString());
+                Assert.Contains("paragraph 1", errors.ToString());
+                Assert.Contains("unsupported", errors.ToString());
+                Assert.Contains(nested ? "plain cached text" : "separate supported", errors.ToString());
+                Assert.DoesNotContain("Stack Trace", errors.ToString());
+                Assert.Equal(template, File.ReadAllBytes(templatePath));
+                if (mode == "existing") Assert.Equal(sentinel, File.ReadAllBytes(outputPath));
+                else Assert.False(File.Exists(outputPath));
+            }
+            finally { Directory.Delete(directory, true); }
+        }
+
+        [Fact]
+        public void Non_bmp_value_generates_valid_stdout_with_preserved_fields_and_formatting()
+        {
+            var w = WordXml.RunElementName.Namespace;
+            var field = new System.Xml.Linq.XElement(WordXml.SimpleFieldElementName, new System.Xml.Linq.XAttribute(WordXml.InstructionAttributeName, "MERGEFIELD Name \\* MERGEFORMAT"),
+                new System.Xml.Linq.XElement(w + "r", Docx.Properties(), new System.Xml.Linq.XElement(w + "t", "x")),
+                new System.Xml.Linq.XElement(w + "r", Docx.Properties(), new System.Xml.Linq.XElement(w + "t", "y")));
+            var template = Docx.Create(Docx.P(field));
+            Docx.AssertValid(template);
+            var path = Path.GetTempFileName();
+            File.WriteAllBytes(path, template);
+            try
+            {
+                var app = new CliApplication(new CliOptionsParser(), Docx.CreateEngine());
+                using var output = new MemoryStream();
+                using var errors = new StringWriter();
+                Assert.Equal(0, app.Run([CliArguments.Template, path, CliArguments.Json, "{\"Name\":\"😀 crane 🚧\"}"], Stream.Null, output, errors));
+                Assert.Empty(errors.ToString());
+                Docx.AssertValid(output.ToArray());
+                var xml = Docx.Read(output.ToArray());
+                Assert.Equal("😀 crane 🚧", Docx.Text(xml));
+                Assert.Equal("MERGEFIELD Name \\* MERGEFORMAT", (string?)Assert.Single(xml.Descendants(WordXml.SimpleFieldElementName)).Attribute(WordXml.InstructionAttributeName));
+                Assert.Equal(2, xml.Descendants(WordXml.RunPropertiesElementName).Count());
+                Assert.All(xml.Descendants(WordXml.RunPropertiesElementName), p => Assert.True(System.Xml.Linq.XNode.DeepEquals(Docx.Properties(), p)));
+                Assert.Equal(template, File.ReadAllBytes(path));
+            }
+            finally { File.Delete(path); }
+        }
+
+        [Theory]
         [InlineData("--json")]
         [InlineData("--json-file")]
         [InlineData("--stdin")]

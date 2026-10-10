@@ -23,6 +23,8 @@
 
 10. A shortened workflow for minor technical tasks is allowed only with Product Owner approval. Required checks and tests for affected behavior still apply.
 
+11. Maintain the product backlog in `.docs/features/backlog.md`. When new requirements or ideas are identified but deferred, propose adding them to the backlog for Product Owner approval. Do not silently discard deferred requirements or create Feature directories for backlog items. When a backlog item is selected for implementation, assign the next sequential Feature ID and follow the standard workflow.
+
 ## Coding Guidelines
 
 1. Implement services as class instances. Inject dependencies on other services through constructors. Do not use public or internal static service methods. Private static helper methods are allowed, but classes containing constants must not contain service logic.

@@ -13,6 +13,12 @@ namespace MonoReport.Services
         private readonly ValueFormatter _valueFormatter = valueFormatter ?? throw new ArgumentNullException(nameof(valueFormatter));
         private readonly CachedResultWriter _resultWriter = resultWriter ?? throw new ArgumentNullException(nameof(resultWriter));
 
+        public void Preflight(XElement root, string location)
+        {
+            _fieldParser.Validate(root, location);
+            _regionParser.Validate(_fieldParser.Parse(root, location));
+        }
+
         public void Render(XElement root, string location, MergeContext context)
         {
             var fields = _fieldParser.Parse(root, location);

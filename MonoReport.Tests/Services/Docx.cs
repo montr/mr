@@ -10,6 +10,71 @@ namespace MonoReport.Tests.Services
 {
     internal static class Docx
     {
+        internal static byte[] CreateStories(string? invalidPart, params XElement[] invalid)
+        {
+            var w = WordXml.DocumentElementName.Namespace;
+            XNamespace r = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+            XElement[] Content(string uri) => invalidPart == uri ? invalid.Select(x => new XElement(x)).ToArray() : new[]
+            {
+                P(Field("MERGEFIELD Name \\* SpellOut")), P(Field("PAGE", "7")),
+                P(Field("MERGEFIELD TableStart:Empty")), P(Field("MERGEFIELD TableEnd:Empty")),
+                P(Field("MERGEFIELD TableStart:Items")), P(Field("MERGEFIELD Item", properties: Properties())), P(Field("MERGEFIELD TableEnd:Items"))
+            };
+            using var stream = new MemoryStream();
+            stream.Write(Create(Content("/word/document.xml")));
+            stream.Position = 0;
+            using (var document = WordprocessingDocument.Open(stream, true))
+            {
+                var main = document.MainDocumentPart!;
+                var header = main.AddNewPart<HeaderPart>();
+                var footer = main.AddNewPart<FooterPart>();
+                var footnotes = main.AddNewPart<FootnotesPart>();
+                var endnotes = main.AddNewPart<EndnotesPart>();
+                void Save(OpenXmlPart part, XElement xml)
+                {
+                    using var target = part.GetStream(FileMode.Create, FileAccess.Write);
+                    new XDocument(xml).Save(target);
+                }
+                Save(header, new XElement(w + "hdr", Content(header.Uri.ToString())));
+                Save(footer, new XElement(w + "ftr", Content(footer.Uri.ToString())));
+                Save(footnotes, new XElement(w + "footnotes", new XElement(w + "footnote", new XAttribute(w + "id", "1"), Content(footnotes.Uri.ToString()))));
+                Save(endnotes, new XElement(w + "endnotes", new XElement(w + "endnote", new XAttribute(w + "id", "1"), Content(endnotes.Uri.ToString()))));
+                var mainContents = Content("/word/document.xml").ToList();
+                mainContents.Add(P(new XElement(w + "r", new XElement(w + "footnoteReference", new XAttribute(w + "id", "1")), new XElement(w + "endnoteReference", new XAttribute(w + "id", "1")))));
+                mainContents.Add(new XElement(w + "sectPr", new XElement(w + "headerReference", new XAttribute(w + "type", "default"), new XAttribute(r + "id", main.GetIdOfPart(header))), new XElement(w + "footerReference", new XAttribute(w + "type", "default"), new XAttribute(r + "id", main.GetIdOfPart(footer)))));
+                Save(main, new XElement(w + "document", new XElement(w + "body", mainContents)));
+            }
+            return stream.ToArray();
+        }
+
+        internal static IReadOnlyDictionary<string, XDocument> ReadStories(byte[] bytes)
+        {
+            using var stream = new MemoryStream(bytes);
+            using var doc = WordprocessingDocument.Open(stream, false);
+            var main = doc.MainDocumentPart!;
+            var parts = new List<OpenXmlPart> { main };
+            parts.AddRange(main.HeaderParts);
+            parts.AddRange(main.FooterParts);
+            if (main.FootnotesPart is not null) parts.Add(main.FootnotesPart);
+            if (main.EndnotesPart is not null) parts.Add(main.EndnotesPart);
+            return parts.ToDictionary(p => p.Uri.ToString(), p => { using var input = p.GetStream(); return XDocument.Load(input); });
+        }
+
+        internal static XElement Character(string type) => new(WordXml.FieldCharacterElementName, new XAttribute(WordXml.FieldCharacterTypeAttributeName, type));
+
+        internal static XElement[] ComplexContent(string code, params XElement[] result) => new[]
+        {
+            new XElement(WordXml.RunElementName, Character("begin"), new XElement(WordXml.InstructionTextElementName, code), Character("separate"))
+        }.Concat(result).Append(new XElement(WordXml.RunElementName, Character("end"))).ToArray();
+
+        internal static XElement[] NestedResult(bool outerSimple, bool innerSimple, string outerCode, string innerCode, bool noInnerResult = false)
+        {
+            var inner = innerSimple ? new[] { Field(innerCode, noInnerResult ? "" : "cache") }
+                : noInnerResult ? new[] { new XElement(WordXml.RunElementName, Character("begin"), new XElement(WordXml.InstructionTextElementName, innerCode), Character("end")) }
+                : ComplexContent(innerCode, Run("cache"));
+            return outerSimple ? new[] { new XElement(WordXml.SimpleFieldElementName, new XAttribute(WordXml.InstructionAttributeName, outerCode), inner) } : ComplexContent(outerCode, inner);
+        }
+
         internal static XElement Run(string text) => new(WordXml.RunElementName, new XElement(WordXml.TextElementName, text));
 
         internal static XElement P(params object[] contents) => new(WordXml.ParagraphElementName, contents);

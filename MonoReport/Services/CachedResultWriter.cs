@@ -63,6 +63,11 @@ namespace MonoReport.Services
             for (var i = 0; i < texts.Count; i++)
             {
                 var length = i == texts.Count - 1 ? value.Length - offset : Math.Min(texts[i].Value.Length, value.Length - offset);
+                if (length > 0 && offset + length < value.Length && char.IsHighSurrogate(value[offset + length - 1]) && char.IsLowSurrogate(value[offset + length]))
+                {
+                    length++;
+                }
+
                 var part = value.Substring(offset, length);
                 offset += length;
                 var nodes = new List<XElement>();

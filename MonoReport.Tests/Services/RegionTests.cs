@@ -7,6 +7,122 @@ namespace MonoReport.Tests.Services
 {
     public sealed class RegionTests
     {
+        internal static XElement[] ConflictingLayout(string layout, string secondName = "B")
+        {
+            var startA = Docx.Field("MERGEFIELD TableStart:A");
+            var endA = Docx.Field("MERGEFIELD TableEnd:A");
+            var startB = Docx.Field("MERGEFIELD TableStart:" + secondName);
+            var endB = Docx.Field("MERGEFIELD TableEnd:" + secondName);
+            return layout switch
+            {
+                "paragraph" => new[] { Docx.P(startA, endA, startB, endB) },
+                "row" => new[] { Docx.Table(Docx.Row(startA, endA, startB, endB)) },
+                "boundary-paragraph" => new[] { Docx.P(startA), Docx.P(endA, startB), Docx.P(endB) },
+                "boundary-row" => new[] { Docx.Table(Docx.Row(startA), Docx.Row(endA, startB), Docx.Row(endB)) },
+                "ancestor-paragraph" => new[] { Docx.Table(new XElement(WordXml.TableRowElementName, new XElement(WordXml.TableCellElementName, Docx.P(startA, endA), Docx.P(startB, endB)))) },
+                "ancestor-table" => new[] { Docx.Table(new XElement(WordXml.TableRowElementName, new XElement(WordXml.TableCellElementName, Docx.P(startA, endA), Docx.Table(Docx.Row(startB, endB)), Docx.P()))) },
+                _ => throw new ArgumentException(layout)
+            };
+        }
+
+        public static IEnumerable<object[]> ConflictingCases()
+        {
+            foreach (var layout in new[] { "paragraph", "row", "boundary-paragraph", "boundary-row", "ancestor-paragraph", "ancestor-table" })
+            foreach (var sameName in new[] { true, false })
+                yield return new object[] { layout, sameName };
+        }
+
+        [Theory]
+        [MemberData(nameof(ConflictingCases))]
+        public void Independent_footprint_conflicts_have_original_context_and_preserve_input(string layout, bool sameName)
+        {
+            var second = sameName ? "A" : "B";
+            var template = Docx.Create(ConflictingLayout(layout, second));
+            Docx.AssertValid(template);
+            var engine = Docx.CreateEngine();
+            using var input = new MemoryStream(template);
+            using var data = System.Text.Json.JsonDocument.Parse("{\"A\":[{}],\"B\":[{}]}");
+            var error = Assert.Throws<TemplateException>(() => engine.Merge(input, data));
+            Assert.Equal("A", error.Field);
+            Assert.Equal("MERGEFIELD TableStart:A", error.FieldCode);
+            Assert.Contains("'A'", error.Message);
+            Assert.Contains("'" + second + "'", error.Message);
+            Assert.Contains("paragraph", error.Location);
+            Assert.Contains("/word/document.xml", error.Location);
+            Assert.Contains("field occurrence", error.Message);
+            Assert.Contains("unsupported shared/overlapping-block", error.Message);
+            Assert.Contains("separate supported", error.Message);
+            Assert.Contains("no shared boundary", error.Message);
+            if (layout.Contains("row") || layout.Contains("ancestor")) Assert.Contains("row 1", error.Location);
+            Assert.True(input.CanRead);
+            Assert.Equal(template, input.ToArray());
+            using var good = new MemoryStream(Docx.Create(Docx.P(Docx.Field("MERGEFIELD Name"))));
+            using var goodData = System.Text.Json.JsonDocument.Parse("{\"Name\":\"fresh\"}");
+            var result = engine.Merge(good, goodData);
+            Docx.AssertValid(result.Document);
+            Assert.Equal("fresh", Docx.Text(Docx.Read(result.Document)));
+        }
+
+        [Theory]
+        [InlineData("{}", 1)]
+        [InlineData("{\"Parent\":null}", 1)]
+        [InlineData("{\"Parent\":[]}", 1)]
+        [InlineData("{\"Parent\":[{}]}", 1)]
+        [InlineData("{}", 2)]
+        [InlineData("{\"Parent\":null}", 2)]
+        [InlineData("{\"Parent\":[]}", 2)]
+        [InlineData("{\"Parent\":[{\"Parent\":[]}]}", 2)]
+        public void Nested_sibling_conflicts_reject_even_when_parent_does_not_render(string json, int depth)
+        {
+            var contents = new List<XElement>();
+            for (var i = 0; i < depth; i++) contents.Add(Docx.P(Docx.Field("MERGEFIELD TableStart:Parent")));
+            contents.AddRange(ConflictingLayout("paragraph"));
+            for (var i = 0; i < depth; i++) contents.Add(Docx.P(Docx.Field("MERGEFIELD TableEnd:Parent")));
+            var template = Docx.Create(contents.ToArray());
+            Docx.AssertValid(template);
+            var error = Assert.Throws<TemplateException>(() => Docx.Merge(template, json));
+            Assert.Contains("'A'", error.Message);
+            Assert.Contains("'B'", error.Message);
+            Assert.Contains("paragraph " + (depth + 1), error.Location);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(3)]
+        public void Same_named_disjoint_and_nested_regions_preserve_fields_and_complete_formatting(int count)
+        {
+            var template = Docx.Create(Docx.P(Docx.Field("MERGEFIELD Header")),
+                Docx.P(Docx.Field("MERGEFIELD TableStart:Items"), Docx.Field("MERGEFIELD Name", properties: Docx.Properties()), Docx.Field("MERGEFIELD TableEnd:Items")),
+                Docx.P(Docx.Field("MERGEFIELD TableStart:Items")),
+                Docx.P(Docx.Field("MERGEFIELD TableStart:Items"), Docx.Field("MERGEFIELD Name", properties: Docx.Properties()), Docx.Field("MERGEFIELD TableEnd:Items")),
+                Docx.P(Docx.Field("MERGEFIELD TableEnd:Items")), Docx.P(Docx.Field("MERGEFIELD Header")));
+            var items = Enumerable.Range(0, count).Select(i => new { Name = "outer" + i, Items = new[] { new { Name = "child" + i } } }).ToArray();
+            var output = Docx.Merge(template, System.Text.Json.JsonSerializer.Serialize(new { Header = "header", Items = items }));
+            var xml = Docx.Read(output.Document);
+            Assert.Equal("header" + string.Concat(items.Select(x => x.Name)) + string.Concat(Enumerable.Range(0,count).Select(i => "child" + i)) + "header", Docx.Text(xml));
+            Assert.DoesNotContain("TableStart", xml.ToString());
+            Assert.DoesNotContain("TableEnd", xml.ToString());
+            Assert.Equal(2 + 2 * count, xml.Descendants(WordXml.SimpleFieldElementName).Count());
+            Assert.All(xml.Descendants(WordXml.RunPropertiesElementName), p => Assert.True(XNode.DeepEquals(Docx.Properties(), p)));
+            Assert.All(xml.Descendants(WordXml.SimpleFieldElementName), f => Assert.Contains("MERGEFIELD", (string?)f.Attribute(WordXml.InstructionAttributeName)));
+        }
+
+        [Fact]
+        public void Independent_regions_sharing_paragraph_are_rejected()
+        {
+            var template = Docx.Create(Docx.P(Docx.Field("MERGEFIELD TableStart:A"), Docx.Field("MERGEFIELD Name"), Docx.Field("MERGEFIELD TableEnd:A"), Docx.Field("MERGEFIELD TableStart:B"), Docx.Field("MERGEFIELD Name"), Docx.Field("MERGEFIELD TableEnd:B")));
+            Docx.AssertValid(template);
+            var error = Assert.Throws<TemplateException>(() => Docx.Merge(template, "{\"A\":[{\"Name\":\"one\"}],\"B\":[{\"Name\":\"two\"}]}"));
+            Assert.Contains("'A'", error.Message);
+            Assert.Contains("'B'", error.Message);
+            Assert.Contains("paragraph 1", error.Location);
+            Assert.Contains("/word/document.xml", error.Location);
+            Assert.Contains("separate", error.Message);
+            Assert.Contains("shared boundary", error.Message);
+            Assert.Equal("MERGEFIELD TableStart:A", error.FieldCode);
+        }
+
         [Theory]
         [InlineData(0)]
         [InlineData(1)]

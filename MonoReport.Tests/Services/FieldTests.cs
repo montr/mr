@@ -7,6 +7,123 @@ namespace MonoReport.Tests.Services
 {
     public sealed class FieldTests
     {
+        public static IEnumerable<object[]> NestedCachedCases()
+        {
+            foreach (var outer in new[] { true, false })
+            foreach (var inner in new[] { true, false })
+            foreach (var code in new[] { "PAGE", "MERGEFIELD Inner", "IF 1 = 1 yes no" })
+            foreach (var empty in new[] { true, false })
+            foreach (var outerCode in new[] { "MERGEFIELD Name", "MERGEFIELD TableStart:Items", "MERGEFIELD TableEnd:Items" })
+                yield return new object[] { outer, inner, code, empty, outerCode };
+        }
+
+        [Theory]
+        [MemberData(nameof(NestedCachedCases))]
+        public void Cached_nested_matrix_rejects_all_representations_types_and_markers(bool outer, bool inner, string nestedCode, bool empty, string outerCode)
+        {
+            var content = Docx.P(Docx.NestedResult(outer, inner, outerCode, nestedCode, empty));
+            var template = Docx.Create(content);
+            Docx.AssertValid(template);
+            var engine = Docx.CreateEngine();
+            using var stream = new MemoryStream(template);
+            using var data = JsonDocument.Parse("{\"Items\":[]}");
+            var error = Assert.Throws<TemplateException>(() => engine.Merge(stream, data));
+            Assert.Equal(outerCode[11..], error.Field);
+            Assert.Equal(outerCode, error.FieldCode);
+            Assert.Contains(nestedCode.Split(' ')[0], error.Message);
+            if (nestedCode.StartsWith("MERGEFIELD")) Assert.Contains("'Inner'", error.Message);
+            Assert.Contains("/word/document.xml, paragraph 1", error.Location);
+            Assert.Contains("unsupported", error.Message);
+            Assert.Contains("outside", error.Message);
+            Assert.Contains("plain cached text", error.Message);
+            Assert.True(stream.CanRead);
+            Assert.Equal(template, stream.ToArray());
+            using var validStream = new MemoryStream(Docx.Create(Docx.P(Docx.Field("MERGEFIELD Name"))));
+            using var validData = JsonDocument.Parse("{\"Name\":\"reused\"}");
+            var valid = engine.Merge(validStream, validData);
+            Docx.AssertValid(valid.Document);
+            Assert.Equal("reused", Docx.Text(Docx.Read(valid.Document)));
+            Assert.Empty(valid.Warnings);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void Deep_nested_cached_field_is_rejected(bool outerSimple)
+        {
+            var inner = new XElement(WordXml.SimpleFieldElementName, new XAttribute(WordXml.InstructionAttributeName, "PAGE"), Docx.Field("IF 1 = 1 yes no"));
+            var contents = outerSimple ? new[] { new XElement(WordXml.SimpleFieldElementName, new XAttribute(WordXml.InstructionAttributeName, "MERGEFIELD Name"), inner) }
+                : Docx.ComplexContent("MERGEFIELD Name", inner);
+            var bytes = Docx.Create(Docx.P(contents));
+            Docx.AssertValid(bytes);
+            Assert.Throws<TemplateException>(() => Docx.Merge(bytes, "{}"));
+        }
+
+        [Fact]
+        public void Instruction_nesting_and_independent_word_fields_preserve_exact_codes_and_content()
+        {
+            var page = Docx.Field("PAGE", "17");
+            var conditional = Docx.ComplexContent("IF 1 = 1 yes no", Docx.Run("yes"));
+            var contents = new[] { new XElement(WordXml.RunElementName, Docx.Character("begin"), new XElement(WordXml.InstructionTextElementName, "MERGEFIELD Name ")) }
+                .Concat(Docx.ComplexContent("PAGE", Docx.Run("instruction page")))
+                .Concat(new[] { new XElement(WordXml.RunElementName, Docx.Character("separate")), Docx.Run("old"), new XElement(WordXml.RunElementName, Docx.Character("end")) }).ToArray();
+            var template = Docx.Create(Docx.P(contents), Docx.P(page, conditional, Docx.Field("MERGEFIELD Other")));
+            Docx.AssertValid(template);
+            var original = Docx.Read(template);
+            var result = Docx.Merge(template, "{\"Name\":\"updated\",\"Other\":\"sibling\"}");
+            var xml = Docx.Read(result.Document);
+            Assert.Equal("instruction pageupdated17yessibling", Docx.Text(xml));
+            Assert.Equal(original.Descendants(WordXml.InstructionTextElementName).Select(x => x.Value), xml.Descendants(WordXml.InstructionTextElementName).Select(x => x.Value));
+            Assert.Equal(original.Descendants(WordXml.FieldCharacterElementName).Select(x => (string?)x.Attribute(WordXml.FieldCharacterTypeAttributeName)), xml.Descendants(WordXml.FieldCharacterElementName).Select(x => (string?)x.Attribute(WordXml.FieldCharacterTypeAttributeName)));
+            Assert.Equal(page.ToString(), xml.Descendants(WordXml.SimpleFieldElementName).First(x => (string?)x.Attribute(WordXml.InstructionAttributeName) == "PAGE").ToString());
+        }
+
+        [Theory]
+        [InlineData("PAGE")]
+        [InlineData("MERGEFIELD Inner")]
+        public void Complex_cached_nested_fields_are_rejected_before_merge(string nestedCode)
+        {
+            var template = Docx.Create(Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", nestedCode)));
+            Docx.AssertValid(template);
+            var error = Assert.Throws<TemplateException>(() => Docx.Merge(template, "{\"Name\":\"new\",\"Inner\":\"inner\"}"));
+            Assert.Equal("Name", error.Field);
+            Assert.Equal("MERGEFIELD Name", error.FieldCode);
+            Assert.Contains(nestedCode.Split(' ')[0], error.Message);
+            Assert.Contains("paragraph 1", error.Location);
+            Assert.Contains("/word/document.xml", error.Location);
+            Assert.Contains("plain cached text", error.Message);
+            Assert.Contains("outside", error.Message);
+        }
+
+        [Theory]
+        [InlineData(true, "😀A🚧B𐐀", "Z🚧")]
+        [InlineData(false, "😀A🚧B𐐀", "Z🚧")]
+        [InlineData(true, "A😀🚧Z", "😀")]
+        [InlineData(false, "A😀🚧Z", "😀")]
+        public void Unicode_scalar_boundaries_preserve_runs_codes_and_remerge(bool simple, string value, string second)
+        {
+            var runs = new[] { "x", "", "xx", "x", "xx" }.Select(text => new XElement(WordXml.RunElementName, Docx.Properties(), new XElement(WordXml.TextElementName, text))).ToArray();
+            const string code = " MERGEFIELD Name \\* MERGEFORMAT ";
+            XElement field = simple
+                ? new XElement(WordXml.SimpleFieldElementName, new XAttribute(WordXml.InstructionAttributeName, code), runs)
+                : Docx.P(new XElement(WordXml.RunElementName, new XElement(WordXml.FieldCharacterElementName, new XAttribute(WordXml.FieldCharacterTypeAttributeName, "begin")), new XElement(WordXml.InstructionTextElementName, code), new XElement(WordXml.FieldCharacterElementName, new XAttribute(WordXml.FieldCharacterTypeAttributeName, "separate"))), runs, new XElement(WordXml.RunElementName, new XElement(WordXml.FieldCharacterElementName, new XAttribute(WordXml.FieldCharacterTypeAttributeName, "end"))));
+            var template = Docx.Create(simple ? Docx.P(field) : field);
+            Docx.AssertValid(template);
+            var original = Docx.Read(template);
+            foreach (var replacement in new[] { value, second, "", "BMP text" })
+            {
+                var result = Docx.Merge(template, JsonSerializer.Serialize(new { Name = replacement }));
+                var xml = Docx.Read(result.Document);
+                Assert.Equal(replacement, Docx.Text(xml));
+                Assert.Equal(original.Descendants(WordXml.RunElementName).Count(), xml.Descendants(WordXml.RunElementName).Count());
+                Assert.Equal(original.Descendants(WordXml.RunPropertiesElementName).Select(x => x.ToString()), xml.Descendants(WordXml.RunPropertiesElementName).Select(x => x.ToString()));
+                Assert.Equal(original.Descendants(WordXml.InstructionTextElementName).Select(x => x.Value), xml.Descendants(WordXml.InstructionTextElementName).Select(x => x.Value));
+                Assert.Equal(original.Descendants(WordXml.FieldCharacterElementName).Select(x => (string?)x.Attribute(WordXml.FieldCharacterTypeAttributeName)), xml.Descendants(WordXml.FieldCharacterElementName).Select(x => (string?)x.Attribute(WordXml.FieldCharacterTypeAttributeName)));
+                if (simple) Assert.Equal(code, (string?)Assert.Single(xml.Descendants(WordXml.SimpleFieldElementName)).Attribute(WordXml.InstructionAttributeName));
+                template = result.Document;
+            }
+        }
+
         [Theory]
         [InlineData("CompanyName", "{\"CompanyName\":\"ООО Ромашка\"}", "ООО Ромашка")]
         [InlineData("Customer.Address.City", "{\"Customer\":{\"Address\":{\"City\":\"Москва\"}}}", "Москва")]
