@@ -35,6 +35,8 @@
 
 4. Prefer primary constructors where possible. Initialize fields and properties from their parameters, preserving null validation with `?? throw` and external dependency injection. Use regular constructors only when the required logic cannot be correctly expressed using primary constructors and initializers.
 
+5. MonoReport must support multiple document formats, including DOCX and future XLSX. Keep format-specific logic isolated and avoid DOCX-specific assumptions in shared APIs and components. Do not introduce premature abstractions or implement additional formats without an approved Feature.
+
 ## Documentation Rules
 
 1. Write all project rules, Skills, specifications, plans, architecture decisions, and other project documentation in English. This does not restrict the language used in discussions with the Product Owner.

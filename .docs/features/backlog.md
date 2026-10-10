@@ -3,9 +3,29 @@
 
 Future capabilities identified during the initial MonoReport specification and subsequent development.
 
-These items are proposals, not approved Feature Specs. Their scope, priority, and implementation details require Product Owner approval.
+The product architecture principles below record approved product direction. Planned capabilities are not approved Feature Specs; their detailed scope, priority, and implementation require Product Owner approval through the Feature Workflow.
+
+## Product Architecture — Multiple Document Formats
+
+1. MonoReport is intended to support multiple document formats, not only DOCX.
+2. Microsoft Word (DOCX) and Microsoft Excel (XLSX) are target formats; XLSX support is planned, not implemented.
+3. Design shared components and public contracts with future XLSX support in mind.
+4. Keep format-specific parsing, template processing, and rendering isolated.
+5. Reuse common functionality where appropriate, including data resolution and formatting.
+6. Do not assume DOCX and XLSX must use identical template syntax.
+7. Avoid premature abstractions or refactoring the existing DOCX engine solely for future Excel support. Implementation of additional formats requires an approved Feature.
 
 ## Planned Capabilities
+
+### Excel Template Engine
+
+Status: Planned, not implemented. Detailed scope requires a future approved Feature Spec.
+
+1. Generate XLSX workbooks from templates and structured data.
+2. Evaluate Excel-native approaches to fields, repeated regions, and formatting.
+3. Preserve workbook structure, formulas, styles, and other relevant Excel features.
+4. Reuse suitable shared components without tightly coupling XLSX to DOCX.
+5. Define detailed behavior and acceptance criteria in a future Feature Spec.
 
 ### Conditional Rendering
 
@@ -22,6 +42,12 @@ Provide an ASP.NET Core API for rendering documents from templates and JSON data
 Constraints:
 1. Keep the core engine independent of the HTTP layer.
 2. Define the API contract when the feature is planned.
+3. Provide an OpenAPI specification for all public HTTP endpoints.
+4. Document request and response schemas, authentication where applicable, errors, and supported document formats.
+5. Provide interactive API documentation through Swagger UI or an equivalent OpenAPI-compatible interface.
+6. Prefer generating OpenAPI documentation from actual API contracts.
+7. Verify that documentation remains consistent with the implemented API.
+8. Design the API contract to accommodate DOCX and future XLSX without unnecessary breaking changes.
 
 ### Word Add-in
 
