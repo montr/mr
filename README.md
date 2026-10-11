@@ -1,199 +1,239 @@
-# MonoReport — DOCX Template Merge Engine
+# MonoReport
 
-Projects targeting **.NET 10 / C# 14**:
+MonoReport generates DOCX documents from Microsoft Word templates and JSON data. It preserves Word fields and formatting, repeats collection regions, and supports custom value formatters. It requires .NET SDK 10; Microsoft Word is needed to edit or inspect templates, not to run the engine.
 
-1. `MonoReport` — an engine built on Open XML SDK 3.5.1, with the `MonoReport.Services` and `MonoReport.Models` namespaces.
-2. `MonoReport.Tests` — automated xUnit tests, including output validation with `OpenXmlValidator`.
-3. `MonoReport.Cli` — a console application that generates DOCX documents from a template and JSON.
+1. `MonoReport` is the library.
+2. `MonoReport.Cli` is the command-line application.
+3. `MonoReport.Tests` contains the automated tests, including Open XML validation.
 
-.NET SDK 10 is required. Microsoft Word does not need to be installed.
+Build and test from the repository root:
 
-```powershell
+```bash
 dotnet build MonoReport.slnx -c Release
 dotnet test MonoReport.slnx -c Release
 ```
 
-`NuGet.Config` uses only the official HTTPS nuget.org source.
+![Word template, JSON data, and generated construction estimate](.docs/Template%20to%20JSON%20to%20Document%20Workflow.png)
+
+This illustration shows the workflow conceptually. For working templates, use the actual Word MERGEFIELD syntax and item-relative paths described in [Collections](#collections); the pictured field notation and JSON are illustrative.
 
 ## API
 
+Inject `MergeEngine` into your application's document service. This example opens fresh inputs for each generation and returns an independent document with any warnings. The caller decides where to save it.
+
 ```csharp
 using System.Text.Json;
-using MonoReport.Services;
 using MonoReport.Models;
+using MonoReport.Services;
 
-using var template = File.OpenRead("template.docx");
-using var data = JsonDocument.Parse("""
-    {"CompanyName":"Northwind Construction LLC","Amount":125430.50}
-    """);
-
-var registry = new FormatterRegistry(new Dictionary<string, IValueFormatter>
+public sealed class DocumentService(MergeEngine engine)
 {
-    [RubSpellOutFormatter.FormatterName] = new RubSpellOutFormatter()
-});
-var fieldParser = new OoxmlFieldParser(new FieldCodeParser());
-var renderer = new DocumentRenderer(new DataResolver(), fieldParser, new RegionParser(),
-    new ValueFormatter(registry), new CachedResultWriter());
-var engine = new MergeEngine(renderer);
-MergeResult result = engine.Merge(template, data);
-File.WriteAllBytes("result.docx", result.Document);
+    private readonly MergeEngine _engine = engine
+        ?? throw new ArgumentNullException(nameof(engine));
+
+    public MergeResult Generate(
+        string templatePath, string json, MergeOptions? options = null)
+    {
+        using var template = File.OpenRead(templatePath);
+        using var data = JsonDocument.Parse(json);
+        return _engine.Merge(template, data, options);
+    }
+}
 ```
 
-Insert an actual Word field, for example through **Insert → Quick Parts → Field → MergeField**. Manually typed text such as `{ MERGEFIELD ... }` is not a Word field.
+`MergeEngine.Merge` reads a stream from its current position without modifying or closing it. The caller owns both input objects. It processes the main document, headers, footers, footnotes, and endnotes. Template and formatting errors throw `TemplateException`, with field, code, and document-location details where available.
 
-```text
-{ MERGEFIELD CompanyName \* MERGEFORMAT }
-{ MERGEFIELD Customer.Address.City }
-{ MERGEFIELD Amount \# "#,##0.00" }
-{ MERGEFIELD ContractDate \@ "dd.MM.yyyy" }
+For example, this application method receives `DocumentService` from its caller and saves the construction estimate:
+
+```csharp
+void SaveEstimate(DocumentService documents)
+{
+    var json = File.ReadAllText("Samples/sample.json");
+    var result = documents.Generate("Samples/sample.template.docx", json);
+    File.WriteAllBytes("result.docx", result.Document);
+}
 ```
 
-The input stream is read from its current position and is neither modified nor closed. The caller retains ownership of the `JsonDocument` as well. The result is an independent DOCX byte array. The engine processes the main document, headers, footers, footnotes, and endnotes.
+### Dependency injection
+
+Add these registrations to the `IServiceCollection services` supplied by your application's host or composition root:
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+
+services.AddMonoReport();
+services.AddTransient<DocumentService>();
+```
+
+Standalone applications using Microsoft's provider need the `Microsoft.Extensions.DependencyInjection` package alongside `MonoReport`. The host or composition root owns provider creation and disposal. Default engine services are transient, and the formatter registry and built-in formatter are singleton within the provider; no scope is needed for the default graph. Registration preserves consumer overrides and can be repeated without duplicating defaults. Manual constructor composition remains supported as an alternative.
 
 ## Fields and formatting
 
-Both `w:fldSimple` and complex fields using `begin / instrText / separate / end` are supported, including instructions and results split across nodes, runs, and paragraphs. A missing cached result is created. Field codes are preserved; the `dirty` attribute is cleared so that populated fields are not marked as requiring an update.
+Insert a real Word field through **Insert → Quick Parts → Field → MergeField**. Typing braces and field text does not create a field. For example:
 
-All existing `w:rPr` properties are preserved. When a result spans multiple runs, the new text is distributed according to their original lengths, with any remainder placed in the last run. This preserves each fragment's formatting. Newlines and tabs become `w:br` and `w:tab` elements.
-
-Standard switches:
-
-1. `\* Upper`, `Lower`, `Caps`, `FirstCap`, `MERGEFORMAT`.
-2. `\#` — numeric formats, including `#,##0.00`.
-3. `\@` — date formats, including `dd.MM.yyyy`.
-4. Combinations of switches in the order specified in the field.
-
-Numeric and date formats use .NET formatting facilities. The complete grammar of all historical Word picture switches is not implemented. ISO 8601 is recommended for dates in JSON. The default culture is `InvariantCulture`; it can be set explicitly:
-
-```csharp
-var options = new MergeOptions
-{
-    Culture = System.Globalization.CultureInfo.GetCultureInfo("en-GB"),
-    MissingValues = MissingValueBehavior.Warning
-};
-var result = engine.Merge(template, data, options);
-foreach (var warning in result.Warnings)
-    Console.WriteLine(warning.Message);
+```text
+{ MERGEFIELD Contractor.Name \* MERGEFORMAT }
+{ MERGEFIELD Totals.Amount \# "#,##0.00" }
+{ MERGEFIELD DeliveryDate \@ "dd MMM yyyy" }
 ```
 
-Missing fields are replaced with an empty string by default. Warning and error behaviors are also available. JSON `null` represents an empty value. JSON property names are case-sensitive, and paths use dot notation. Objects and arrays cannot be inserted into scalar fields. Template errors are reported as `TemplateException`, including the field, original code, formatter, and document-part URI when available.
+Simple and complex Word fields are supported, including split instructions and cached results. Field codes and existing run formatting remain intact. Cached text is replaced across the existing runs; Unicode characters remain valid at run boundaries. Newlines and tabs become Word breaks and tabs. Populated fields are not marked as needing an update.
 
-To merge ordinary fields again, pass `result.Document` through a new `MemoryStream`: values are updated while field codes and formatting remain intact.
+1. `\* Upper`, `Lower`, `Caps`, and `FirstCap` transform text; `MERGEFORMAT` preserves formatting.
+2. `\#` applies a .NET numeric format, such as `#,##0.00`.
+3. `\@` applies a .NET date format, such as `dd MMM yyyy`; use ISO 8601 dates in JSON.
+4. Switches may be combined and run in their specified order. The complete historical Word picture-format grammar is not implemented.
+
+JSON property names are case-sensitive; dotted paths resolve nested properties. JSON `null` produces empty text. Objects and arrays cannot be inserted as scalar values. Missing fields are empty by default; warning and error policies are available. The default numeric/date culture is invariant.
+
+This optional block goes inside `SaveEstimate`, after the JSON is read. Its `documents` parameter and `json` local variable come from that method. `Generate` opens a fresh template for each call:
+
+```csharp
+var optionsResult = documents.Generate(
+    "Samples/sample.template.docx", json,
+    new MonoReport.Models.MergeOptions
+    {
+        Culture = System.Globalization.CultureInfo.GetCultureInfo("en-GB"),
+        MissingValues = MonoReport.Models.MissingValueBehavior.Warning
+    });
+foreach (var warning in optionsResult.Warnings)
+    Console.WriteLine(warning.Message);
+File.WriteAllBytes("result-en-GB.docx", optionsResult.Document);
+```
+
+To update ordinary fields again, merge the generated bytes through a new `MemoryStream` with new data. Field codes and formatting remain available for the next merge.
 
 ## Collections
 
+Use MERGEFIELD markers around the rows to repeat. Keep the table header outside the region:
+
 ```text
-Table header                        ← outside the region; preserved
+Material                            | Quantity | Unit price
 { MERGEFIELD TableStart:Items }      ← separate marker row
-{ MERGEFIELD Name } | { MERGEFIELD Quantity } | { MERGEFIELD Price \# "0.00" }
-{ MERGEFIELD TableEnd:Items }        ← separate marker row
+{ MERGEFIELD Name }                  | { MERGEFIELD Quantity } | { MERGEFIELD Price \# "0.00" }
+{ MERGEFIELD TableEnd:Items }         ← separate marker row
 ```
 
 ```json
 {"Items":[{"Name":"Portland cement (25 kg bag)","Quantity":100,"Price":500},{"Name":"Concrete blocks (440 x 215 x 100 mm)","Quantity":250,"Price":261.722}]}
 ```
 
-The region is copied for each item. An empty array produces no data rows, while the header remains. Marker fields are removed, as are rows or paragraphs containing only those fields. Ordinary `MERGEFIELD` fields in data rows remain fields.
+1. The engine repeats the region for each item; an empty array produces no data rows. It removes markers and rows or paragraphs containing only markers, while retaining ordinary fields and the outside header.
+2. Inside a region, use paths relative to the current item, such as `Name`, not `Items.Name`. There is no implicit lookup in the parent object. Nested collections restore the enclosing item's context when the inner region ends.
+3. Put boundaries in rows of the same table or paragraphs sharing a parent. Both markers may surround fields in one data row. For nested regions, use separate boundary rows or paragraphs. Ranges across tables or document parts are unsupported.
+4. Independent regions must have separate, nonoverlapping paragraph or row ranges. Shared blocks, including overlaps through nested tables, are rejected; genuine parent/child regions are supported.
+5. Re-expanding a collection requires the original template. Generated documents no longer contain region markers or row-to-array bindings; re-merging them updates ordinary fields without reconstructing collections.
 
-Region boundaries must be in rows of the same table or in paragraphs sharing a parent. Both markers can also appear in a single data row, surrounding its fields. Arbitrary ranges across different tables or document parts are not supported. Use separate boundary rows or paragraphs for nested regions.
-
-1. Independent regions must use separate paragraph or table-row ranges with no shared boundary block. Shared or overlapping block footprints, including containment through nested tables, are rejected; genuine logical parent/child regions remain supported.
-2. Nested Word fields inside an ordinary or technical-marker `MERGEFIELD` cached result are unsupported. Move the nested field outside the outer result or replace that result with plain cached text. Instruction nesting and independent sibling Word fields retain their existing behavior.
-3. The engine validates these structures in every processed story part before changing any story. A `TemplateException` identifies the field or conflicting collections, original part URI, paragraph/table-row context when available, and the required template correction. CLI rejection emits a diagnostic without producing DOCX output or replacing an existing output file.
-
-
-Within a region, paths resolve strictly relative to the current item: use `Name`, rather than `Items.Name`. There is no implicit lookup in the parent object. Nested `Orders → Items` collections are supported through a context stack; finishing the inner region restores the order context, and finishing the outer region restores the root object.
-
-**Expanding collections again:** use the original template. Marker fields are removed after a merge, as required by the specification; the result does not retain the original region or each row's array-index binding. Merging a generated document again supports ordinary fields but does not reconstruct collection structure.
+Nested Word fields in a MERGEFIELD's cached result are unsupported. Move them outside that result or replace it with plain cached text. Instruction nesting and independent sibling Word fields keep their supported behavior. The engine validates all processed document parts before rendering; invalid layouts produce actionable errors without partial CLI output.
 
 ## Custom formatters
 
-An amount in words can be requested directly in the field code:
+To request an amount in words in the template, display the field code with **Shift+F9** and add `\* SpellOut`:
 
 ```text
 { MERGEFIELD Totals.Amount \* SpellOut }
 { MERGEFIELD Totals.Amount \* SpellOut \* MERGEFORMAT }
 ```
 
-In Word, insert a MERGEFIELD, display its code with Shift+F9, and add `\* SpellOut` after the field name. No tags or additional CLI options are needed. `SpellOut` is a MonoReport extension rather than a built-in Word formatter: MonoReport computes its result when run. The formatter name is case-insensitive. A field using the same JSON path without `SpellOut` continues to display a number; field codes and formatting remain intact after a merge.
+`SpellOut` is a MonoReport extension. It generates Russian RUB wording regardless of numeric/date culture: `125430.50` becomes `Сто двадцать пять тысяч четыреста тридцать рублей 50 копеек`. It supports grammatical inflection, negative values, and rounding to kopecks away from zero; the rounded absolute amount must be below 10¹⁸ RUB. Formatter names are case-insensitive.
 
-Formatters can also be bound programmatically through the API:
+Alternatively, the following optional block also goes inside `SaveEstimate` and binds the built-in formatter programmatically. Create `formatter-template.docx` with an ordinary `{ MERGEFIELD Amount }` field, without a numeric `\#` switch: a programmatic formatter runs before field switches, and its words cannot be processed as a number.
 
 ```csharp
-var options = new MergeOptions
-{
-    FieldFormatters = new Dictionary<string, FormatterBinding>
+var formatterResult = documents.Generate(
+    "formatter-template.docx", """{"Amount":125430.50}""",
+    new MonoReport.Models.MergeOptions
     {
-        ["Amount"] = new("spellOut", new Dictionary<string, string>
+        FieldFormatters = new Dictionary<string, MonoReport.Models.FormatterBinding>
         {
-            ["currency"] = "RUB"
-        })
-    }
-};
-var result = engine.Merge(template, data, options);
+            ["Amount"] = new("spellOut", new Dictionary<string, string>
+            {
+                ["currency"] = "RUB"
+            })
+        }
+    });
+File.WriteAllBytes("amount-in-words.docx", formatterResult.Document);
 ```
 
-`125430.50` → `Сто двадцать пять тысяч четыреста тридцать рублей 50 копеек`.
+For other transformations, implement `IValueFormatter` and use the existing `FormatterRegistry.Register` method. Resolve the shared registry from the provider and finish registration before the first merge and before concurrent use. Bindings use field names, including item-relative fields inside collections; a `\* SpellOut` switch receives the original JSON value at its position in the switch sequence.
 
-The built-in `spellOut` formatter produces Russian text for RUB amounts, regardless of the selected numeric/date culture. It supports grammatical inflection, negative numbers, and kopeck rounding away from zero. After rounding, the absolute amount must be less than 10¹⁸ rubles. For other currencies or transformations, implement `IValueFormatter` and register it with `FormatterRegistry.Register`. Bindings use field names, including fields inside collections. An API-bound formatter runs before field switches; `\* SpellOut` runs at its position in the switch sequence and receives the original JSON value.
+A shared registry supports concurrent reads after configuration, not registration during merges. Its formatters must be thread-safe and have singleton-compatible dependencies. A formatter with scoped dependencies needs a consumer-provided scoped registry, engines resolved within that same scope, and appropriate scope disposal; never capture it in the default singleton registry. Provider validation does not inspect manually captured objects. Each merge needs independent inputs and options that are not mutated during use.
 
-## Architecture and current implementation boundaries
+## Command-line application
 
-1. `OoxmlFieldParser` / `FieldCodeParser` — OOXML fields and instruction parsing.
-2. `MergeField`, `FieldReference`, `Region` / `RegionParser` — models and nesting validation.
-3. `DataResolver` — JSON paths and the context stack.
-4. `ValueFormatter`, `FormatterRegistry`, `RubSpellOutFormatter` — formatting.
-5. `CachedResultWriter`, `DocumentRenderer`, `MergeEngine` — cached-result updates, region repetition, and DOCX package handling.
+The CLI uses the same DI registration as library consumers. Invoke its built DLL to keep build messages out of binary output.
 
-The specification's basic stage, ordinary and nested collections, extensible registry, and RUB spell-out are implemented. Conditions, an HTTP service, a Word Add-in, and HTML/PDF belong to future specification stages and are not included. The engine does not perform business calculations or execute template code. Other Word fields, such as `PAGE`, are not evaluated by the engine.
+1. `--template <path>` / `-t <path>` supplies the required DOCX template.
+2. `--output <path>` / `-o <path>` writes a file after a successful merge. Omit it or use `-` for binary stdout. Existing files are overwritten only after rendering succeeds.
+3. Choose one JSON source: `--json '<JSON>'`, `--json-file <path>`, or `--stdin`. File input is UTF-8; quote inline JSON for your shell. With no source option, the CLI reads stdin until EOF.
+4. `--culture <culture>` selects numeric/date culture, such as `en-GB`; the default is invariant.
+5. `--help` / `-h` shows help.
+6. Exit codes are `0` for success, `1` for input/render/output errors, and `2` for invalid arguments. Diagnostics go to stderr; generation stdout contains only DOCX bytes.
 
-Tests cover fields, all listed switches, split instructions, formatting preservation, repeated merges, collections of size 0/1/N, nested contexts, headers and footers, diagnostics, and formatter extension. Successful outputs are checked with Open XML Validator; visual inspection in Microsoft Word is not automated.
+### Construction estimate sample
 
-Parsing, formatting, and writing services are instances with constructor-injected dependencies. The consuming application composes the service graph and supplies it through public constructors. `MergeEngine` has no parameterless constructor. The registry receives formatters externally. Data context and warnings are created separately for each Merge call.
+`Samples` contains `sample.template.docx`, `sample.json`, and `sample.docx`. The estimate identifies the Riverside Community Centre in Moscow and Northwind Construction LLC, repeats three material lines, and totals RUB 125,430.50. Labels and source data are English; the generated RUB amount in words is Russian. Quantities, prices, line totals, and summaries are supplied in JSON; MonoReport does not calculate business values.
 
-## MonoReport.Cli — console application
+Run commands from the repository root. Build once:
 
-The application references the `MonoReport` project. It accepts a DOCX template path, a JSON source, and an optional output path. The CLI entry point composes engine services and supplies dependencies through constructors.
-
-1. `--template <path>` / `-t <path>` — required template path.
-2. `--output <path>` / `-o <path>` — output path; an existing file is overwritten after a successful merge. If omitted or set to `-`, DOCX is written to stdout as binary data.
-3. `--json '<JSON>'` — JSON supplied directly as a command-line argument. Quote escaping depends on the shell.
-4. `--json-file <path>` — path to a UTF-8 JSON file.
-5. `--stdin` — read UTF-8 JSON from standard input until EOF. This is also the default when neither `--json` nor `--json-file` is specified. JSON sources are mutually exclusive.
-6. `--culture <culture>` — numeric and date formatting culture, such as `en-GB`. The default is invariant culture.
-7. `--help` / `-h` — help.
-8. Exit codes: `0` — success; `1` — read, merge, or write error; `2` — argument error. Diagnostics go to stderr; during generation, stdout contains only DOCX bytes.
-
-### Construction project cost estimate sample
-
-The repository-root `Samples` directory contains `sample.template.docx`, `sample.json`, and the generated `sample.docx`. The header identifies the construction project and contractor, including tax ID, registration number, address, contact, and email. The table repeats the `Materials` collection and displays each material's reference, delivery date, description, quantity, unit, unit price, line total, and currency. The summary shows the number of material lines, total cost, and amount in words.
-
-The example estimates materials for the Riverside Community Centre in Moscow, supplied by Northwind Construction LLC: Portland cement, concrete paving slabs, and washed building sand. The three lines total RUB 125,430.50. `LineTotal`, `Totals.Count`, and `Totals.Amount` are already calculated in JSON; the engine does not perform business calculations. Both total fields use `Totals.Amount`: the numeric field uses `\# "#,##0.00"`, while the amount-in-words field uses `{ MERGEFIELD Totals.Amount \* SpellOut }`. All sample labels and data are English except the engine-generated Russian RUB amount in words, retained to demonstrate the existing formatter. No additional CLI arguments or duplicate JSON value are required for that formatter. Convert amounts in different currencies in the consuming application before combining them.
-
-Run these commands from the repository root. The source template is `sample.template.docx`, and the generated document is `sample.docx`:
-
-```powershell
+```bash
 dotnet build MonoReport.Cli/MonoReport.Cli.csproj -c Release
-dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll --template Samples/sample.template.docx --json-file Samples/sample.json --output Samples/sample.docx --culture en-GB
 ```
 
-Read JSON from stdin in PowerShell and write the result to a file:
+Generate from a JSON file in Bash:
+
+```bash
+dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll \
+  --template Samples/sample.template.docx \
+  --json-file Samples/sample.json \
+  --output sample.docx \
+  --culture en-GB
+```
+
+Pass inline JSON in Bash:
+
+```bash
+dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll \
+  --template Samples/sample.template.docx \
+  --json "$(cat Samples/sample.json)" \
+  --output sample.docx \
+  --culture en-GB
+```
+
+Read stdin and redirect binary stdout in Bash:
+
+```bash
+dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll \
+  --template Samples/sample.template.docx \
+  --culture en-GB \
+  < Samples/sample.json > sample.docx
+```
+
+Read UTF-8 stdin and write a file in PowerShell:
 
 ```powershell
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-Get-Content -Raw -Encoding UTF8 Samples/sample.json | dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll --template Samples/sample.template.docx --stdin --output Samples/sample.docx --culture en-GB
+Get-Content -Raw -Encoding UTF8 Samples/sample.json |
+  dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll `
+    --template Samples/sample.template.docx `
+    --stdin `
+    --output sample.docx `
+    --culture en-GB
 ```
 
-Pass JSON as a Bash argument:
+Read stdin and redirect binary stdout in `cmd.exe`:
 
-```bash
-dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll --template Samples/sample.template.docx --json "$(cat Samples/sample.json)" --output Samples/sample.docx --culture en-GB
+```cmd
+dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll ^
+  --template Samples/sample.template.docx ^
+  --culture en-GB ^
+  < Samples/sample.json > sample.docx
 ```
 
-Read stdin and redirect binary stdout in Bash or `cmd.exe`:
+Windows PowerShell 5.1 text redirection is unsuitable for binary DOCX; use `--output`. With unredirected stdin, finish your JSON input with EOF so generation can proceed.
 
-```text
-dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll --template Samples/sample.template.docx --culture en-GB < Samples/sample.json > Samples/sample.docx
-```
+## Current limitations
 
-For stdout, invoke the already-built DLL so that `dotnet run` build messages cannot enter the DOCX output. In Windows PowerShell 5.1, use `--output` because its text redirection with `>` is unsuitable for binary DOCX. With `--stdin` and no redirection, the application waits for JSON and the end of input (EOF).
+1. DOCX is implemented. XLSX is planned; HTTP API, Word Add-in, conditions, and HTML/PDF output are not included.
+2. Other Word fields, such as `PAGE`, are preserved but not evaluated. The engine does not execute template code or business calculations.
+3. Manual Microsoft Word inspection remains useful for visual layout; automated checks validate Open XML and observable fields, formatting, and document structure.

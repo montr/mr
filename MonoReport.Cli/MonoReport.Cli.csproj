@@ -8,6 +8,7 @@
     <ProjectReference Include="../MonoReport/MonoReport.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
     <InternalsVisibleTo Include="MonoReport.Tests" />
   </ItemGroup>
 </Project>

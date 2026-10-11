@@ -1,5 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
 using MonoReport.Cli.Services;
-using MonoReport.Services;
 
 namespace MonoReport.Cli
 {
@@ -7,14 +7,12 @@ namespace MonoReport.Cli
     {
         private static int Main(string[] args)
         {
-            var registry = new FormatterRegistry(new Dictionary<string, IValueFormatter>
-            {
-                [RubSpellOutFormatter.FormatterName] = new RubSpellOutFormatter()
-            });
-            var fieldParser = new OoxmlFieldParser(new FieldCodeParser());
-            var renderer = new DocumentRenderer(new DataResolver(), fieldParser, new RegionParser(),
-                new ValueFormatter(registry), new CachedResultWriter());
-            var application = new CliApplication(new CliOptionsParser(), new MergeEngine(renderer));
+            var services = new ServiceCollection();
+            services.AddMonoReport();
+            services.AddTransient<CliOptionsParser>();
+            services.AddTransient<CliApplication>();
+            using var provider = services.BuildServiceProvider();
+            var application = provider.GetRequiredService<CliApplication>();
             return application.Run(args, Console.OpenStandardInput(), Console.OpenStandardOutput(), Console.Error);
         }
     }
