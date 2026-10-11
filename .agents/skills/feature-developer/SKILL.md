@@ -18,6 +18,7 @@ description: Plan and implement approved features using automated tests and evid
 5. Record exact commands and outcomes; distinguish passed, failed, and not run. Never claim success from an unexecuted command.
 6. Hand off diff, test results, limitations, and unresolved issues for independent review.
 7. No unapproved push, merge, publication, or branch deletion.
+8. When changing public behavior or recommended usage, update affected existing user-facing documentation and usage examples, including README.md, to remain consistent with the implementation.
 
 ## Workflow ownership and documentation
 

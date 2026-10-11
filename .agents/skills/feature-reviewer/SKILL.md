@@ -15,3 +15,13 @@ description: Independently review MonoReport implementation plans and code for s
 
 9. Record plan review outcomes in `implementation-plan.md` and implementation review outcomes and executed verification in `review.md`. Orchestrator owns phase transitions; corrections can remain in `review`. Record Product Owner acceptance only when explicitly given, separately from Reviewer PASS.
 10. Write documentation in English with explicitly sequential numbered lists. Do not add code-formatting examples unless requested. Do not begin the Feature 001 implementation audit during workflow registration.
+
+## Mandatory documentation consistency review
+
+11. When a feature changes a public API, CLI, configuration, dependency injection, or recommended usage pattern, review all affected user-facing documentation, including README.md.
+12. Review each affected document in full, not only changed sections. Verify that existing examples remain correct, relevant, and consistent with the implementation and recommended usage.
+13. Report outdated, contradictory, duplicated, or misleading primary usage examples as review findings.
+14. Compile code examples and execute CLI commands where practical; distinguish executed checks from source-only inspection and state execution limitations.
+15. Check for unnecessary repetition, excessive implementation details, and inconsistent terminology.
+16. Verify that documentation reflects the intended user experience, not merely the literal implementation-plan requirements.
+17. Do not report documentation review as PASS while unresolved documentation inconsistencies remain.
