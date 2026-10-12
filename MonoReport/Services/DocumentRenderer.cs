@@ -42,7 +42,7 @@ namespace MonoReport.Services
                 var collection = _resolver.Resolve(region.Start.Field.Collection, region.Start.Field.Code, location, context);
                 if (collection.ValueKind is not (JsonValueKind.Array or JsonValueKind.Null or JsonValueKind.Undefined))
                 {
-                    throw _regionParser.Error(region.Start, "collection value must be an array");
+                    throw new TemplateException($"Region '{region.Start.Field.Collection}': collection value must be an array ({location}).", region.Start.Field.Collection, region.Start.Field.Code, location, code: "generation.invalid_data");
                 }
 
                 if (collection.ValueKind == JsonValueKind.Array)

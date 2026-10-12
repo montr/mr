@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using System.Xml.Linq;
 using MonoReport.Models;
 
@@ -88,6 +89,91 @@ public sealed class CliProcessTests
         Assert.NotEmpty(invalidJson.Error);
     }
 
+    [Theory]
+    [InlineData("valid", 0, true)]
+    [InlineData("structural", 1, false)]
+    [InlineData("corrupt", 1, false)]
+    [InlineData("empty", 1, false)]
+    public async Task Real_entry_point_validation_returns_exact_json_and_exit_contract(
+        string fixture, int expectedExit, bool expectedValid)
+    {
+        var directory = EvidenceDirectory();
+        var path = Path.Combine(directory, fixture + ".docx");
+        var bytes = fixture switch
+        {
+            "valid" => Docx.Create(Docx.P(Docx.Field("MERGEFIELD Missing \\* UnavailableFormatter"))),
+            "structural" => Docx.Create(Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE"))),
+            "corrupt" => Encoding.UTF8.GetBytes("not a DOCX package"),
+            _ => []
+        };
+        File.WriteAllBytes(path, bytes);
+
+        var result = await Run(directory, ["--validate", "--template", path]);
+
+        Assert.Equal(expectedExit, result.ExitCode);
+        Assert.Empty(result.Error);
+        using var json = JsonDocument.Parse(result.Output);
+        Assert.Equal(3, json.RootElement.EnumerateObject().Count());
+        Assert.Equal(expectedValid, json.RootElement.GetProperty("valid").GetBoolean());
+        Assert.Equal(JsonValueKind.Array, json.RootElement.GetProperty("errors").ValueKind);
+        Assert.Equal(JsonValueKind.Array, json.RootElement.GetProperty("warnings").ValueKind);
+        Assert.Equal(expectedValid ? 0 : 1, json.RootElement.GetProperty("errors").GetArrayLength());
+    }
+
+    public static IEnumerable<object[]> InvalidValidationArguments()
+    {
+        yield return new object[] { new[] { "--validate" } };
+        yield return new object[] { new[] { "--validate", "--template", "" } };
+        yield return new object[] { new[] { "--validate", "--template", "a", "--json", "{}" } };
+        yield return new object[] { new[] { "--json-file", "data.json", "--validate", "--template", "a" } };
+        yield return new object[] { new[] { "--validate", "--template", "a", "--stdin" } };
+        yield return new object[] { new[] { "--validate", "--template", "a", "--culture", "en-US" } };
+        yield return new object[] { new[] { "--validate", "--template", "a", "--output", "-" } };
+        yield return new object[] { new[] { "-o", "result.docx", "--validate", "-t", "a" } };
+        yield return new object[] { new[] { "--validate", "--template", "a", "--unknown" } };
+        yield return new object[] { new[] { "--validate", "--template", "a", "positional" } };
+        yield return new object[] { new[] { "--validate", "--validate", "--template", "a" } };
+        yield return new object[] { new[] { "--validate", "-t", "a", "--template", "b" } };
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidValidationArguments))]
+    public async Task Real_entry_point_validation_rejects_every_invalid_argument_class(string[] arguments)
+    {
+        var result = await Run(EvidenceDirectory(), arguments);
+        Assert.Equal(2, result.ExitCode);
+        Assert.Empty(result.Output);
+        Assert.NotEmpty(result.Error);
+    }
+
+    [Fact]
+    public async Task Real_entry_point_validation_handles_help_and_missing_file()
+    {
+        var directory = EvidenceDirectory();
+        var help = await Run(directory, ["--validate", "--unknown", "--help"]);
+        Assert.Equal(0, help.ExitCode);
+        Assert.Contains("--validate", Encoding.UTF8.GetString(help.Output));
+        Assert.Empty(help.Error);
+
+        var missing = await Run(directory, ["--validate", "--template", Path.Combine(directory, "missing.docx")]);
+        Assert.Equal(1, missing.ExitCode);
+        Assert.Empty(missing.Output);
+        Assert.Contains("could not be completed", missing.Error);
+        Assert.DoesNotContain(directory, missing.Error);
+    }
+
+    [Fact]
+    public async Task Real_entry_point_validation_exits_while_redirected_stdin_remains_open()
+    {
+        var directory = EvidenceDirectory();
+        var template = Path.Combine(AppContext.BaseDirectory, "sample.template.docx");
+        var result = await Run(directory, ["--validate", "--template", template], keepInputOpen: true);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Empty(result.Error);
+        using var json = JsonDocument.Parse(result.Output);
+        Assert.True(json.RootElement.GetProperty("valid").GetBoolean());
+    }
+
     private static string EvidenceDirectory()
     {
         var root = Environment.GetEnvironmentVariable("MONOREPORT_TEST_EVIDENCE") ?? Path.Combine(Path.GetTempPath(), "feature002-di-evidence");
@@ -96,7 +182,8 @@ public sealed class CliProcessTests
         return directory;
     }
 
-    private static async Task<ProcessResult> Run(string evidence, IReadOnlyList<string> arguments, string? input = null)
+    private static async Task<ProcessResult> Run(string evidence, IReadOnlyList<string> arguments,
+        string? input = null, bool keepInputOpen = false)
     {
         // Use the executable project output with its own runtimeconfig and deps files.
         var configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent!.Name;
@@ -115,8 +202,9 @@ public sealed class CliProcessTests
         try
         {
             if (input is not null) await process.StandardInput.WriteAsync(input);
-            process.StandardInput.Close();
+            if (!keepInputOpen) process.StandardInput.Close();
             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30));
+            if (keepInputOpen) process.StandardInput.Close();
             await outputTask.WaitAsync(TimeSpan.FromSeconds(5));
             var error = await errorTask.WaitAsync(TimeSpan.FromSeconds(5));
             var result = new ProcessResult(process.ExitCode, output.ToArray(), error);
@@ -128,6 +216,7 @@ public sealed class CliProcessTests
         }
         finally
         {
+            process.StandardInput.Dispose();
             if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(); }
         }
     }

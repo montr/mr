@@ -10,7 +10,7 @@ namespace MonoReport.Tests.Services;
 
 public sealed class DependencyInjectionTests
 {
-    private static readonly Type[] Transients = [typeof(MergeEngine), typeof(DocumentRenderer), typeof(DataResolver), typeof(OoxmlFieldParser), typeof(FieldCodeParser), typeof(RegionParser), typeof(ValueFormatter), typeof(CachedResultWriter)];
+    private static readonly Type[] Transients = [typeof(MergeEngine), typeof(TemplateValidator), typeof(DocxStoryReader), typeof(TemplateStructureValidator), typeof(DocumentRenderer), typeof(DataResolver), typeof(OoxmlFieldParser), typeof(FieldCodeParser), typeof(RegionParser), typeof(ValueFormatter), typeof(CachedResultWriter)];
     private static readonly Type[] Singletons = [typeof(FormatterRegistry), typeof(RubSpellOutFormatter)];
 
     [Fact]
@@ -18,7 +18,7 @@ public sealed class DependencyInjectionTests
     {
         var services = new ServiceCollection();
         Assert.Same(services, services.AddMonoReport());
-        Assert.Equal(10, services.Count);
+        Assert.Equal(Transients.Length + Singletons.Length, services.Count);
         foreach (var type in Transients) Assert.Equal(ServiceLifetime.Transient, Assert.Single(services, d => d.ServiceType == type).Lifetime);
         foreach (var type in Singletons) Assert.Equal(ServiceLifetime.Singleton, Assert.Single(services, d => d.ServiceType == type).Lifetime);
     }

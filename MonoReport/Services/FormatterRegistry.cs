@@ -17,7 +17,7 @@ namespace MonoReport.Services
         {
             if (_formatters.TryGetValue(name, out var formatter) == false)
             {
-                throw new FormatException($"Unknown formatter: {name}");
+                throw new MonoReport.Models.UnknownFormatterException($"Unknown formatter: {name}");
             }
 
             return formatter.Format(value, culture, options ?? new Dictionary<string, string>());

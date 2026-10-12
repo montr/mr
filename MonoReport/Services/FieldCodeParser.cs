@@ -21,7 +21,7 @@ namespace MonoReport.Services
 
             if (tokens.Count < 2 || string.IsNullOrWhiteSpace(tokens[1]) || tokens[1].StartsWith('\\'))
             {
-                throw new TemplateException("MERGEFIELD has no field name.", fieldCode: code, location: location);
+                throw new TemplateException("MERGEFIELD has no field name.", fieldCode: code, location: location, code: "template.invalid_field_syntax");
             }
 
             var switches = new List<FieldSwitch>();
@@ -29,7 +29,7 @@ namespace MonoReport.Services
             {
                 if (i + 1 >= tokens.Count || tokens[i].StartsWith('\\') == false)
                 {
-                    throw new TemplateException("Invalid field switch.", tokens[1], code, location);
+                    throw new TemplateException("Invalid field switch.", tokens[1], code, location, code: "template.invalid_field_syntax");
                 }
 
                 switches.Add(new(tokens[i], tokens[i + 1]));
@@ -38,7 +38,7 @@ namespace MonoReport.Services
             var field = new MergeField(tokens[1], code, switches);
             if (field.IsRegion && string.IsNullOrWhiteSpace(field.Collection))
             {
-                throw new TemplateException("Region has no collection name.", field.Name, code, location);
+                throw new TemplateException("Region has no collection name.", field.Name, code, location, code: "template.invalid_field_syntax");
             }
 
             return field;
@@ -78,7 +78,7 @@ namespace MonoReport.Services
 
                     if (i == input.Length)
                     {
-                        throw new TemplateException("Unterminated quoted field argument.", fieldCode: code, location: location);
+                        throw new TemplateException("Unterminated quoted field argument.", fieldCode: code, location: location, code: "template.invalid_field_syntax");
                     }
 
                     i++;

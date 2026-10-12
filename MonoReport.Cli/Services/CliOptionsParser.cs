@@ -14,6 +14,7 @@ namespace MonoReport.Cli.Services
             var culture = CultureInfo.InvariantCulture;
             var seen = new HashSet<string>(StringComparer.Ordinal);
             var sources = 0;
+            var validate = false;
             if (args.Contains(CliArguments.Help) || args.Contains(CliArguments.HelpShort))
             {
                 return new(string.Empty, null, null, null, culture, true);
@@ -35,6 +36,12 @@ namespace MonoReport.Cli.Services
                 if (option == CliArguments.StandardInput)
                 {
                     sources++;
+                    continue;
+                }
+
+                if (option == CliArguments.Validate)
+                {
+                    validate = true;
                     continue;
                 }
 
@@ -82,7 +89,12 @@ namespace MonoReport.Cli.Services
                 throw new ArgumentException("Specify only one JSON source: --json, --json-file or --stdin.");
             }
 
-            return new(template, output, json, jsonFile, culture, false);
+            if (validate && seen.Any(option => option is not (CliArguments.Validate or CliArguments.Template)))
+            {
+                throw new ArgumentException("Validation accepts only --validate and --template (-t).");
+            }
+
+            return new(template, output, json, jsonFile, culture, false, validate);
         }
     }
 }

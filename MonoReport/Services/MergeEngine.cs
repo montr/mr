@@ -6,9 +6,12 @@ using MonoReport.Models;
 
 namespace MonoReport.Services
 {
-    public sealed class MergeEngine(DocumentRenderer renderer)
+    public sealed class MergeEngine(DocumentRenderer renderer, DocxStoryReader storyReader,
+        TemplateStructureValidator structureValidator)
     {
         private readonly DocumentRenderer _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
+        private readonly DocxStoryReader _storyReader = storyReader ?? throw new ArgumentNullException(nameof(storyReader));
+        private readonly TemplateStructureValidator _structureValidator = structureValidator ?? throw new ArgumentNullException(nameof(structureValidator));
 
         /// <summary>Reads the template from its current position. The caller retains ownership of both inputs.</summary>
         public MergeResult Merge(Stream template, JsonDocument data, MergeOptions? options = null)
@@ -26,26 +29,14 @@ namespace MonoReport.Services
             {
                 template.CopyTo(output);
                 output.Position = 0;
-                using (var document = WordprocessingDocument.Open(output, true))
+                using (var document = _storyReader.Open(output, true))
                 {
-                    var main = document.MainDocumentPart ?? throw new TemplateException("DOCX has no main document part.");
-                    var stories = new List<(OpenXmlPart Part, XDocument Xml)>();
-                    foreach (var part in StoryParts(main))
-                    {
-                        XDocument xml;
-                        using (var input = part.GetStream(FileMode.Open, FileAccess.Read))
-                        {
-                            using (var reader = XmlReader.Create(input, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit }))
-                            {
-                                xml = XDocument.Load(reader, LoadOptions.PreserveWhitespace);
-                            }
-                        }
-
-                        stories.Add((part, xml));
-                    }
-
+                    var stories = _storyReader.Read(document);
                     foreach (var (part, xml) in stories)
-                        _renderer.Preflight(xml.Root!, part.Uri.ToString());
+                    {
+                        var error = _structureValidator.ValidateErrors(xml.Root!, part.Uri.ToString()).FirstOrDefault();
+                        if (error is not null) throw error;
+                    }
 
                     foreach (var (part, xml) in stories)
                     {

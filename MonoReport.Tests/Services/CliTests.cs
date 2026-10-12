@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 using MonoReport.Cli.Services;
 using MonoReport.Services;
 
@@ -6,6 +7,12 @@ namespace MonoReport.Tests.Services
 {
     public sealed class CliTests
     {
+        private static CliApplication CreateApplication()
+        {
+            using var provider = new ServiceCollection().AddMonoReport().BuildServiceProvider();
+            return new CliApplication(new CliOptionsParser(), provider.GetRequiredService<MergeEngine>(),
+                provider.GetRequiredService<TemplateValidator>());
+        }
         private const string TemplateFileName = "sample.template.docx";
         private const string DataFileName = "sample.json";
         private const string ExpectedAmountInWords = "Сто двадцать пять тысяч четыреста тридцать рублей 50 копеек";
@@ -32,7 +39,7 @@ namespace MonoReport.Tests.Services
             {
                 var args = new List<string> { CliArguments.Template, templatePath, CliArguments.Json, "{\"Name\":\"replacement\",\"A\":[{}],\"B\":[{}]}" };
                 if (mode != "stdout") args.AddRange(new[] { CliArguments.Output, outputPath });
-                var app = new CliApplication(new CliOptionsParser(), Docx.CreateEngine());
+                var app = CreateApplication();
                 using var output = new MemoryStream();
                 using var errors = new StringWriter();
                 Assert.Equal(1, app.Run(args.ToArray(), Stream.Null, output, errors));
@@ -63,7 +70,7 @@ namespace MonoReport.Tests.Services
             File.WriteAllBytes(path, template);
             try
             {
-                var app = new CliApplication(new CliOptionsParser(), Docx.CreateEngine());
+                var app = CreateApplication();
                 using var output = new MemoryStream();
                 using var errors = new StringWriter();
                 Assert.Equal(0, app.Run([CliArguments.Template, path, CliArguments.Json, "{\"Name\":\"😀 crane 🚧\"}"], Stream.Null, output, errors));
@@ -104,7 +111,7 @@ namespace MonoReport.Tests.Services
                 args.Add(dataPath);
             }
 
-            var application = new CliApplication(new CliOptionsParser(), Docx.CreateEngine());
+            var application = CreateApplication();
             using (var input = new MemoryStream(Encoding.UTF8.GetBytes(json)))
             {
                 using (var output = new MemoryStream())
@@ -192,7 +199,7 @@ namespace MonoReport.Tests.Services
         public void Saves_file_and_does_not_write_docx_to_stdout()
         {
             var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".docx");
-            var app = new CliApplication(new CliOptionsParser(), Docx.CreateEngine());
+            var app = CreateApplication();
 
             try
             {
@@ -221,7 +228,7 @@ namespace MonoReport.Tests.Services
         [InlineData("not-json", "--json", 1)]
         public void Errors_use_stderr_and_leave_stdout_empty(string json, string option, int expected)
         {
-            var app = new CliApplication(new CliOptionsParser(), Docx.CreateEngine());
+            var app = CreateApplication();
             using (var output = new MemoryStream())
             {
                 using (var errors = new StringWriter())
@@ -243,7 +250,7 @@ namespace MonoReport.Tests.Services
 
             try
             {
-                var app = new CliApplication(new CliOptionsParser(), Docx.CreateEngine());
+                var app = CreateApplication();
                 using (var errors = new StringWriter())
                 {
                     Assert.Equal(1, app.Run([CliArguments.Template, Path.Combine(AppContext.BaseDirectory, TemplateFileName),
@@ -280,7 +287,7 @@ namespace MonoReport.Tests.Services
         [Fact]
         public void Help_does_not_require_template_or_input()
         {
-            var app = new CliApplication(new CliOptionsParser(), Docx.CreateEngine());
+            var app = CreateApplication();
             using (var output = new MemoryStream())
             {
                 using (var errors = new StringWriter())

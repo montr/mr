@@ -4,7 +4,8 @@ MonoReport generates DOCX documents from Microsoft Word templates and JSON data.
 
 1. `MonoReport` is the library.
 2. `MonoReport.Cli` is the command-line application.
-3. `MonoReport.Tests` contains the automated tests, including Open XML validation.
+3. `MonoReport.Api` is the separate ASP.NET Core HTTP application. It references Core; Core and CLI have no HTTP dependencies.
+4. `MonoReport.Tests` contains the automated tests, including Open XML validation, actual CLI processes, HTTP integration, OpenAPI, and real Kestrel host checks.
 
 Build and test from the repository root:
 
@@ -17,7 +18,7 @@ dotnet test MonoReport.slnx -c Release
 
 This illustration shows the workflow conceptually. For working templates, use the actual Word MERGEFIELD syntax and item-relative paths described in [Collections](#collections); the pictured field notation and JSON are illustrative.
 
-## API
+## Core API
 
 Inject `MergeEngine` into your application's document service. This example opens fresh inputs for each generation and returns an independent document with any warnings. The caller decides where to save it.
 
@@ -42,6 +43,63 @@ public sealed class DocumentService(MergeEngine engine)
 ```
 
 `MergeEngine.Merge` reads a stream from its current position without modifying or closing it. The caller owns both input objects. It processes the main document, headers, footers, footnotes, and endnotes. Template and formatting errors throw `TemplateException`, with field, code, and document-location details where available.
+
+### Structural template validation
+
+Resolve the injected public `TemplateValidator` through `AddMonoReport()` and call `Validate(Stream template)`. It reads from the stream's current position, supports readable non-seekable streams, does not modify the content, and leaves the caller-owned input open; its position may advance. Dispose the input yourself. The result provides `Valid` and read-only `Errors` and `Warnings` snapshots. Null/unreadable arguments throw argument exceptions; operational I/O failures remain exceptions; invalid or empty DOCX content produces an invalid result.
+
+Validation checks DOCX package and supported story structure, MERGEFIELD syntax and Word field structure, collection marker pairing/nesting/boundaries/overlap, and unsupported fields in cached results. It uses the same structural rules as generation without merging, requiring JSON/culture, evaluating formatters, or generating document bytes. It does not check data paths, types, or whether future generation will succeed, and is not universal OOXML certification.
+
+Issues have stable `code`, safe `message`, and explicit nullable `field`, `part`, and `location`. `part` is a package URI, never a server file path. `valid` is true exactly when `errors` is empty; warnings do not invalidate a template. No heuristic warnings are added. Diagnostics follow main document, ordinal URI order of headers, ordinal URI order of footers, footnotes, then endnotes, with document order within safe stages. Independent errors are collected across readable stories and trustworthy stages. An unsafe parser stack or ambiguous markers stop dependent checks for that story; damaged packages can prevent story discovery. Exhaustive diagnostics and guessed recovery are not promised.
+
+## HTTP API
+
+Build from the repository root with .NET SDK 10 and start the separate host:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://127.0.0.1:5080 \
+  dotnet run --project MonoReport.Api/MonoReport.Api.csproj -c Release --no-build
+```
+
+OpenAPI JSON is at `http://127.0.0.1:5080/openapi/v1.json`; Swagger UI interactive documentation is at `http://127.0.0.1:5080/docs`. Both are enabled by default in every environment after an ordinary API start. Set `MonoReport__DocumentationEnabled=false` to disable both routes or `true` to enable them explicitly, independently of the environment. The host supplies no authentication scheme. Scalar was evaluated first, but its multipart client did not produce a valid upload request with the selected generated contract, so Feature 003 uses the approved Swagger UI fallback.
+
+1. `POST /api/documents/generate` accepts `multipart/form-data` with one required nonempty DOCX file `template`, one required text field `data` containing a single raw JSON value, and optional text `culture`. Omitted/blank culture means invariant; an explicit valid culture overrides it. `Accept-Language` is ignored. Duplicate or wrongly represented known inputs fail; unknown generation inputs are ignored. Submitted filenames never become server paths.
+2. Generation success returns HTTP 200 with raw DOCX bytes, DOCX media type, and attachment filename `document.docx`. `X-MonoReport-Warning-Count` exists only when warnings exist; the default missing-value policy remains empty without warnings. There is no JSON response envelope or success flag.
+3. `POST /api/documents/validate` accepts exactly one nonempty DOCX file `template`. Additional inputs, including data and culture, fail. It directly calls Core validation. Completed validation returns HTTP 200 JSON even for invalid nonempty DOCX content, with `valid`, `errors`, and `warnings`. Both arrays and all nullable issue properties are always present. Empty uploads are request errors.
+
+Generate the sample and save its raw response:
+
+```bash
+curl --fail-with-body http://127.0.0.1:5080/api/documents/generate \
+  -F 'template=@Samples/sample.template.docx' \
+  --form-string "data=$(cat Samples/sample.json)" \
+  --form-string 'culture=en-GB' -o /tmp/monoreport-generated.docx
+```
+
+Validate the sample without JSON or culture:
+
+```bash
+curl --fail-with-body http://127.0.0.1:5080/api/documents/validate \
+  -F 'template=@Samples/sample.template.docx'
+```
+
+### Error contracts
+
+HTTP application errors use RFC 9457 `application/problem+json`: `type`, `title`, `status`, safe `detail`, machine-readable `code`, and `traceId`; optional safe field context may appear. They never return exception stacks, server paths, raw field instructions, input data, or partial generated documents. Stable code identity is independent of message wording.
+
+1. Both endpoints, HTTP 400: missing, empty, duplicate, wrongly represented inputs use `request.missing_input`, `request.empty_input`, `request.duplicate_input`, `request.invalid_input`; malformed multipart or missing boundary uses `request.invalid_multipart`. Validation extra inputs use `request.unexpected_input`.
+2. Both endpoints, HTTP 413: `request.too_large`. HTTP 415: `request.unsupported_media_type` for an overall media type other than multipart/form-data.
+3. Generation, HTTP 400: malformed, trailing-content, or depth-exceeding JSON uses `data.invalid_json`; invalid culture uses `culture.invalid`.
+4. Generation, HTTP 422: unreadable/corrupt DOCX uses `template.invalid_package`; malformed story XML uses `template.invalid_xml`; missing/unsupported story structure uses `template.unsupported_structure`.
+5. Shared structural codes: `template.invalid_field_syntax`, `template.invalid_field_structure`, `template.invalid_region`, `template.overlapping_regions`, and `template.unsupported_nested_field`. Generation returns 422 Problem Details; validation returns 200 with `valid=false` and structured errors, also for the package/XML/structure codes above. Validation never returns 422.
+6. Generation, HTTP 422: incompatible collection/scalar data uses `generation.invalid_data`; failed numeric/date/custom formatting uses `generation.invalid_format`; unavailable formatter uses `generation.unknown_formatter`.
+7. Both endpoints, HTTP 500: unexpected operational failures use `server.internal_error`. These are server failures rather than invalid-template results. A host or reverse proxy rejecting a request before application handling can return its own response instead of application Problem Details.
+
+### Resource policy and deployment
+
+The default whole HTTP request limit is 50 MiB (52,428,800 bytes), including multipart framing and every part. Configure the single positive `MonoReport__MaxRequestBytes` setting (maximum `Int32.MaxValue`) before host startup. Standard Kestrel/form handling enforces the boundary; there are no separate template, JSON, output, generation timeout, application concurrency limiter, queue, or 429 policies. The application disposes its input/JSON/package resources; ASP.NET Core owns request buffering and temporary resources. CLI file validation has no HTTP size limit.
+
+This compressed request bound does not bound decompressed content, generated output, processing time, or aggregate concurrent memory. Synchronous Core merging/validation cannot be hard-cancelled after execution begins; asynchronous transport honors cancellation where possible. Public deployments need infrastructure TLS, access controls, edge request/connection/rate protections, operational timeouts, capacity planning, and monitoring. Provision these at the host/proxy boundary; this repository does not supply deployment manifests or authentication infrastructure.
 
 For example, this application method receives `DocumentService` from its caller and saves the construction estimate:
 
@@ -170,6 +228,17 @@ The CLI uses the same DI registration as library consumers. Invoke its built DLL
 5. `--help` / `-h` shows help.
 6. Exit codes are `0` for success, `1` for input/render/output errors, and `2` for invalid arguments. Diagnostics go to stderr; generation stdout contains only DOCX bytes.
 
+### CLI template validation
+
+`--validate --template <path>` (or `-t <path>`) directly invokes the same injected Core validator as the HTTP endpoint. Only these options are accepted in validation mode; JSON sources, stdin, culture, output, generation options, positional inputs and duplicates are argument errors. `--help` retains precedence. Validation never reads stdin, performs a merge, or writes DOCX bytes.
+
+```bash
+dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll \
+  --validate --template Samples/sample.template.docx
+```
+
+To validate an invalid template, replace the template path with the document to inspect. Exit `0` means valid; exit `1` means invalid template or operational execution failure; exit `2` means invalid arguments. Completed validation writes exactly one JSON result to stdout with the same structure, issue codes/messages/context, nulls, ordering and warnings as HTTP validation. Invalid/corrupt/readable empty local files produce invalid JSON and exit 1 without operational stderr; empty HTTP uploads instead return 400. Missing/unreadable files and unexpected execution/output failures produce safe operational diagnostics on stderr and exit 1. Failures before writing leave stdout empty; an output stream failure can interrupt JSON. Caller-owned stdin/stdout stay open. Generation behavior remains unchanged when `--validate` is absent.
+
 ### Construction estimate sample
 
 `Samples` contains `sample.template.docx`, `sample.json`, and `sample.docx`. The estimate identifies the Riverside Community Centre in Moscow and Northwind Construction LLC, repeats three material lines, and totals RUB 125,430.50. Labels and source data are English; the generated RUB amount in words is Russian. Quantities, prices, line totals, and summaries are supplied in JSON; MonoReport does not calculate business values.
@@ -234,6 +303,6 @@ Windows PowerShell 5.1 text redirection is unsuitable for binary DOCX; use `--ou
 
 ## Current limitations
 
-1. DOCX is implemented. XLSX is planned; HTTP API, Word Add-in, conditions, and HTML/PDF output are not included.
+1. DOCX generation and structural validation through Core, CLI, and HTTP are implemented. XLSX is planned; Word Add-in, conditions, and HTML/PDF output are not included.
 2. Other Word fields, such as `PAGE`, are preserved but not evaluated. The engine does not execute template code or business calculations.
 3. Manual Microsoft Word inspection remains useful for visual layout; automated checks validate Open XML and observable fields, formatting, and document structure.

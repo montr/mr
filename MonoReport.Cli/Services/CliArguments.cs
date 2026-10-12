@@ -3,6 +3,7 @@ namespace MonoReport.Cli.Services
     internal static class CliArguments
     {
         public const string Template = "--template";
+        public const string Validate = "--validate";
         public const string TemplateShort = "-t";
         public const string Output = "--output";
         public const string OutputShort = "-o";

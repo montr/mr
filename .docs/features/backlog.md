@@ -49,6 +49,18 @@ Constraints:
 7. Verify that documentation remains consistent with the implemented API.
 8. Design the API contract to accommodate DOCX and future XLSX without unnecessary breaking changes.
 
+Status: Selected for Feature 003. Detailed scope is governed by the Feature 003 specification and approval workflow.
+
+### MCP Server
+
+Provide a future MCP server integration for MonoReport.
+
+1. Evaluate whether the MCP server should call MonoReport Core directly or use the HTTP API based on deployment, authorization, and operational requirements.
+2. Keep the MCP server outside Feature 003.
+3. Define its detailed scope, security model, transport, and deployment architecture in a future Feature Spec.
+
+Status: Planned, not implemented. Detailed scope requires a future approved Feature Spec.
+
 ### Word Add-in
 
 Provide a Microsoft Word Add-in for creating and editing templates.

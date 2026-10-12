@@ -79,7 +79,10 @@ namespace MonoReport.Services
             }
             catch (Exception ex) when (ex is FormatException or ArgumentException or OverflowException)
             {
-                throw new TemplateException($"Cannot format field '{field.Name}' using '{active}'. Field code: {field.Code}. {ex.Message}", field.Name, field.Code, location, active, ex);
+                var code = ex is UnknownFormatterException ? "generation.unknown_formatter"
+                    : value.ValueKind is JsonValueKind.Object or JsonValueKind.Array ? "generation.invalid_data"
+                    : "generation.invalid_format";
+                throw new TemplateException($"Cannot format field '{field.Name}' using '{active}'. Field code: {field.Code}. {ex.Message}", field.Name, field.Code, location, active, ex, code);
             }
         }
 
