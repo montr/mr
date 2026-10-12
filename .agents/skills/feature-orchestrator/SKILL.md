@@ -1,41 +1,32 @@
 ---
 name: feature-orchestrator
-description: Coordinate features from product discussion through approved spec, plan, TDD implementation, independent review, and acceptance; resume work from persisted state.
+description: Coordinate feature discussion, approved specification, planning, implementation, independent review, and Product Owner acceptance; resume from persisted state.
 ---
+
 # Feature Orchestrator
 
-You are the sole workflow coordinator. Delegate domain work to Architect, Developer, and Reviewer; do not silently substitute your own review for independent review. If independent agents cannot be launched, disclose the limitation and ask for a workable review path.
+1. Coordinate and delegate to Architect, Developer, and independent Reviewer. Do not substitute self-review; if independent agents are unavailable, disclose this and request a review path.
+2. Assign sequential, never-reused IDs (`001`, `002`, etc.) after checking directories and available Git history. Store feature artifacts in `.docs/features/<NNN>-<slug>/`; create only needed documents: `feature-spec.md`, `implementation-plan.md`, `review.md`, `feature-status.json`.
+3. Preserve project rules and uncommitted work. Do not modify controlling Skills/workflow without explicit Product Owner approval. Do not push, merge, publish, or delete branches without approval.
 
-## Feature identity and files
+## Workflow
 
-1. Assign sequential, never-reused feature IDs: `001`, `002`, etc. Inspect existing directories and available Git history before assigning the next ID.
-2. Store documents under `.docs/features/<NNN>-<slug>/`: `feature-spec.md`, `implementation-plan.md`, `feature-status.json`, and `review.md` as applicable. Create documents only when needed; introduce no additional mandatory files, metadata, or tracking mechanisms.
-3. Preserve existing project rules and uncommitted changes. Modify controlling Skills or material workflow rules only with explicit Product Owner approval.
-4. Register the original specification and existing implementation as Feature `001` at `.docs/features/001-initial-implementation/feature-spec.md`, treating the implementation as version `0.0.1`. Preserve substantive requirements and acceptance criteria, translating to English when needed, and update old specification path references. Initialize the phase to `review`; do not invent a retroactive implementation plan, approval, or acceptance. Stop registration before the actual implementation review unless explicitly requested.
+1. `discussion`: Architect prepares specification and works through product decisions with Product Owner. Enter `planning` only after explicit approval of the complete Feature Spec.
+2. `planning`: Developer prepares implementation plan; Reviewer independently reviews it. Resolve blocking plan findings and obtain explicit Product Owner plan approval before entering `implementation`.
+3. `implementation`: Developer implements approved requirements and automated tests, then supplies verification evidence. Enter `review` only when ready, disclosing failed/unexecuted checks.
+4. `review`: Reviewer independently assesses conformance and evidence. **On the first `CHANGES REQUESTED`, record findings with severity, evidence, and rationale; immediately stop and report to Product Owner.** Do not automatically delegate fixes or run another review. Resume only on explicit Product Owner decisions to accept, reject, defer, or selectively authorize corrections. Record decisions; unresolved blocking findings may not silently become `PASS`. Enter `acceptance` only once blockers and required checks are resolved.
+5. `acceptance`: Product Owner explicitly accepts or directs corrections. Use Developer and independent Reviewer for necessary re-verification, returning to `review` as appropriate. Enter `completed` only after explicit Product Owner acceptance.
+6. For approved small technical tasks, a shortened workflow is permitted, but affected checks and tests remain required. Material changes to scope, architecture, requirements, or gates need explicit approval.
 
-## Workflow phases and transitions
+## State and records
 
-1. `discussion`: Architect discusses requirements and architecture with Product Owner and prepares `feature-spec.md`. Enter `planning` only after explicit Product Owner specification approval.
-2. `planning`: Developer prepares `implementation-plan.md`, including implementation steps, verification criteria, and automated test strategy. Reviewer independently reviews it. Resolve blocking findings before requesting explicit Product Owner plan approval. Enter `implementation` only after that approval.
-3. `implementation`: Developer implements the approved plan with automated tests. Prefer Red–Green–Refactor where practical; reproduce bugs with regression tests first. Enter `review` when implementation and agreed verification are ready for independent review; disclose failed or unexecuted checks.
-4. `review`: Reviewer independently verifies requirements, architecture, the plan where applicable, code, and test quality. Developer resolves findings and Reviewer rechecks them. Corrections may remain in `review` without returning to `implementation`. Enter `acceptance` only after blocking findings are resolved and required checks are verified. For Feature 001, acknowledge missing historical approvals or plan rather than fabricating them.
-5. `acceptance`: Product Owner reviews the result and either explicitly accepts it or requests corrections. Route corrections through Developer and independent Reviewer, returning to `review` when re-verification is needed. Material requirements, architecture, scope, workflow order, or approval gate changes require explicit Product Owner approval before proceeding.
-6. `completed`: Enter only after explicit Product Owner acceptance. Reviewer PASS alone does not close a feature.
-7. Record specification approval in `feature-spec.md`, plan approval and independent plan review outcomes in `implementation-plan.md`, and implementation review outcomes, executed verification evidence, and Product Owner acceptance in `review.md`. Do not claim approval or PASS without evidence.
-8. Do not push, merge, publish, or delete branches without explicit Product Owner permission. For minor technical tasks, obtain approval for a shortened workflow; required checks and affected behavior tests still apply.
+1. `feature-status.json` contains **only** `phase`, one of `discussion`, `planning`, `implementation`, `review`, `acceptance`, `completed`. The directory identifies the feature; do not add counters, timestamps, approvals, or test outcomes to this JSON.
+2. Record specification approval in `feature-spec.md`, plan review/approval in `implementation-plan.md`, and implementation review, verification, and acceptance in `review.md`. Never invent approvals or PASS; update phase only when gates are satisfied, atomically where practical.
+3. On resume, inspect `feature-status.json`, relevant feature documents, Git state, and implementation. Reconcile claims with evidence; resume only incomplete authorized work and respect stop/approval gates.
+4. Feature 001 historical registration: retain the original spec in `.docs/features/001-initial-implementation/feature-spec.md`, version `0.0.1`, initially in `review`; preserve requirements, translate into English if needed, and update obsolete path references. Do not invent retrospective approvals/plan or perform an audit/corrections without explicit authorization.
 
-## Minimal state
+## Resource discipline
 
-1. `feature-status.json` contains exactly one property, `phase`, with one of `discussion`, `planning`, `implementation`, `review`, `acceptance`, or `completed`.
-2. Do not add feature IDs, names, approvals, review counters, test results, timestamps, or next-step fields. The directory identifies the feature; documents, Git history, code, and test results provide remaining evidence.
-3. Orchestrator updates state only after the corresponding transition conditions are satisfied; use atomic replacement where practical.
-
-## Resuming interrupted work
-
-1. Read `feature-status.json`.
-2. Inspect existing Feature Spec, Implementation Plan, and Review documents.
-3. Inspect actual Git state and relevant implementation.
-4. Determine what work is complete and what remains.
-5. Verify that required approvals and checks actually occurred; never treat a claimed PASS or test run as verified without evidence.
-6. Treat the phase as a workflow indicator, not authoritative evidence of completion or approval. Report and resolve conflicts with repository evidence before proceeding, without bypassing approval gates.
-7. Continue from the appropriate point and delegate to the responsible role.
+1. Read only relevant files/sections/diffs and valid prior evidence. Keep handoffs and reports concise, with paths, results, decisions, and outstanding work.
+2. After a tool/environment failure, allow at most one focused diagnostic retry; if unresolved, stop and consult Product Owner. Do not silently replace tooling or make material architecture changes.
+3. Never invent token usage or remaining Codex quotas. Browser and automated test execution policy belongs to the Developer and Reviewer Skills.
