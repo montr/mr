@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MonoReport — Playground</title>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:#242831;background:#fff;font-size:13px}*{box-sizing:border-box}body{margin:0}button{font:inherit;cursor:pointer;border:1px solid #dce0e6;border-radius:6px;background:white;color:#374151;padding:7px 12px}button:hover{background:#f5f6f8}button:disabled{opacity:.4;cursor:not-allowed}button:focus-visible,a:focus-visible{outline:2px solid #d64b49;outline-offset:2px}header{height:47px;border-bottom:1px solid #e7e9ed;padding:0 18px;display:flex;align-items:center;gap:11px}.brand{font-weight:750;letter-spacing:-.6px;font-size:15px}.brand b{color:#cf514d}.subbrand{font-size:12px;color:#89909a;border-left:1px solid #e0e3e8;padding-left:12px}.layout{height:calc(100dvh - 80px);min-height:520px;display:grid;grid-template-columns:minmax(320px,var(--left-width,45%)) 7px minmax(360px,1fr)}.splitter{cursor:col-resize;background:#e9ebef;position:relative;touch-action:none;transition:background .15s}.splitter:hover,.splitter.dragging,.splitter:focus-visible{background:#cf4d48;outline:none}.splitter:after{content:"";position:absolute;top:50%;left:2px;transform:translateY(-50%);width:3px;height:34px;border-radius:5px;background:#aab1ba}.splitter:hover:after,.splitter.dragging:after{background:white}.source{display:flex;flex-direction:column;min-width:0;min-height:0}.filebar{padding:12px 16px;display:flex;align-items:center;gap:9px;border-bottom:1px solid #e9ebef;min-height:58px}.label{font-weight:650;color:#383e47}.filename{min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#858d98}.clear{border:0;padding:3px 7px;font-size:18px}.editbar{height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 16px;border-bottom:1px solid #eaedf1}.switch{display:flex;gap:2px;background:#f2f4f6;border-radius:6px;padding:3px}.switch button{border:0;background:transparent;padding:5px 12px;font-size:12px;color:#68717d}.switch button.active{background:white;box-shadow:0 1px 4px #17212d18;color:#212831;font-weight:650}.editbar .small{padding:5px 10px;font-size:12px}.editor{display:flex;min-height:150px;flex:1;position:relative;overflow:hidden;background:#fff}.gutter{font:13px/23px ui-monospace,SFMono-Regular,Consolas,monospace;color:#a7adb7;background:#fbfbfc;padding:16px 12px 16px 9px;min-width:43px;white-space:pre;text-align:right;border-right:1px solid #f0f1f3;overflow:hidden;user-select:none}.codebox{position:relative;flex:1;min-width:0;overflow:hidden}.codebox pre,.codebox textarea{font:13px/23px ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:0;tab-size:2;white-space:pre;overflow:auto;position:absolute;inset:0;margin:0;padding:16px 14px;border:0;outline:0;resize:none;width:100%;height:100%;overflow-wrap:normal}.codebox pre{pointer-events:none;color:#262a31;z-index:1}.codebox textarea{z-index:2;color:transparent;caret-color:#262a31;background:transparent;-webkit-text-fill-color:transparent}.codebox textarea::selection{background:#91bafa55}.token-key{color:#a22c70}.token-string{color:#15814b}.token-num{color:#176ab8}.token-bool{color:#9a5a00}.token-null{color:#818895}.middle{display:none}.gen{border:1px solid #cc4944;background:#cf4d48;color:white;font-weight:650;padding:8px 13px;display:flex;flex-direction:row;align-items:center;gap:8px;border-radius:6px;white-space:nowrap}.gen:hover{background:#b9403c;color:white}.gen svg{width:16px;height:16px}.mobile-gen{display:none}.filebar .filename{flex:1}.edit-actions{display:flex;align-items:center;gap:7px}.footer .version{color:#707985}.footer a{display:inline-flex;align-items:center;gap:5px}.footer a svg{width:13px;height:13px;stroke:currentColor;fill:none}.preview{display:flex;flex-direction:column;min-height:0;min-width:0;background:#f5f6f8}.previewbar{height:58px;background:white;border-bottom:1px solid #e7eaf0;display:flex;align-items:center;padding:0 15px;gap:10px}.tabs{display:flex;align-self:stretch;align-items:stretch;gap:3px}.tabs button{position:relative;border:0;border-radius:0;padding:0 12px;color:#78818e;background:transparent}.tabs button.active{font-weight:650;color:#272d35}.tabs button.active:after{content:"";position:absolute;height:2px;background:#cf4d48;bottom:0;left:10px;right:10px}.count{display:inline-block;font-size:11px;padding:1px 5px;background:#fce7e6;color:#bb4440;border-radius:10px;margin-left:4px}.spacer{flex:1}.download{display:flex;gap:7px;align-items:center}.download svg{width:14px;height:14px}.canvas{flex:1;overflow:auto;min-height:0;padding:30px 26px;display:flex;justify-content:center;align-items:flex-start}.empty{align-self:center;text-align:center;color:#969eaa;line-height:1.9}.empty svg{width:42px;height:42px;stroke:#a5abb4;margin-bottom:8px}.empty strong{font-weight:600;color:#555e6b}.paper{background:#fff;box-shadow:0 3px 18px #14203912;border:1px solid #e6e8ec;padding:42px 48px;width:100%;max-width:630px;min-height:530px;line-height:1.85}.paper h2{font-size:17px;text-align:center;margin:0 0 26px}.paper .field{color:#b34b47;background:#fdf1f0;border-radius:2px;padding:0 3px}.paper p{font-size:13px}.canvas.errors-view{justify-content:stretch}.issues{width:100%;max-width:none;align-self:stretch}.issues-top{display:flex;align-items:center;gap:8px;padding:0 0 17px;border-bottom:1px solid #e2e5eb}.issues-top svg{color:#bf4541}.issues-top strong{font-size:14px}.issue{display:flex;align-items:flex-start;gap:12px;padding:13px 4px;border-bottom:1px solid #e4e7ed}.issue-num{color:#99a0aa;font-size:12px;min-width:18px}.issue strong{font-size:12px;font-weight:600;color:#454a54}.issue p{font:12px/1.5 ui-monospace,Consolas,monospace;color:#767f8c;margin:4px 0 0}.footer{height:33px;border-top:1px solid #e8eaed;display:flex;align-items:center;justify-content:flex-end;gap:19px;padding:0 17px;font-size:11px;background:#fff}.footer a{color:#707985;text-decoration:none}.footer a:hover{text-decoration:underline}.footer .project-links{display:flex;align-items:center;gap:5px}.footer .project-links a{gap:5px}.hidden{display:none!important}input[type=file]{display:none}.notice{padding:8px 15px;border-top:1px solid #f2d0ce;background:#fff7f6;color:#a13d38;font-size:12px}.notice:empty{display:none}.status{font-size:11px;color:#8b949f;white-space:nowrap}@media(max-width:850px){.splitter{display:none}.layout{height:calc(100dvh - 80px);min-height:420px;display:flex;flex-direction:column}.source{height:var(--source-height,50%);flex:none;min-height:160px}.middle{display:block;flex:none;height:8px;background:#e9ebef;position:relative;cursor:row-resize;touch-action:none}.middle:hover,.middle.dragging,.middle:focus-visible{background:#cf4d48;outline:none}.middle:after{content:"";position:absolute;left:50%;top:2px;transform:translateX(-50%);height:3px;width:34px;border-radius:5px;background:#aab1ba}.middle:hover:after,.middle.dragging:after{background:white}.desktop-gen{display:flex}.preview{height:auto;flex:1;min-height:160px}.canvas{padding:18px}.paper{padding:24px}}
+.canvas.drop-target{position:relative;outline:2px dashed #cf4d48;outline-offset:-9px;background:#fff5f4}
+.canvas.drop-target::after{content:"Drop DOCX to select template";position:absolute;inset:18px;display:flex;align-items:center;justify-content:center;background:#ffffffed;border-radius:6px;color:#a33b37;font-weight:600;font-size:14px;pointer-events:none;z-index:5}
+</style>
+</head>
+<body>
+<header><span class="brand"><b>mono</b>report</span><span class="subbrand">Playground</span></header>
+<main class="layout">
+<section class="source" aria-label="Template and input data">
+<div class="filebar"><span class="label">Template</span><button id="choose">Select</button><span class="filename" id="filename">No file selected</span><button class="clear hidden" id="clear" aria-label="Remove template">×</button><button class="gen desktop-gen" id="generate" title="Generate document">Generate <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button><input id="file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></div>
+<div class="editbar"><div class="switch" aria-label="Input mode"><button disabled title="Available after template analysis is implemented">Form</button><button class="active" aria-current="true">JSON</button></div><div class="edit-actions"><button class="small" id="copy">Copy</button><button class="small" id="format">Format</button></div></div>
+<div class="editor"><div class="gutter" id="gutter">1</div><div class="codebox"><pre id="highlight" aria-hidden="true"></pre><textarea id="json" aria-label="JSON data" spellcheck="false" autocomplete="off" autocapitalize="off">{}</textarea></div></div>
+<div id="json-notice" class="notice"></div>
+</section>
+<div class="splitter" id="splitter" role="separator" aria-label="Resize editor and preview" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="45" tabindex="0" title="Drag to resize panels"></div>
+<div class="middle" id="mobile-splitter" role="separator" aria-label="Resize input and preview" aria-orientation="horizontal" aria-valuemin="20" aria-valuemax="80" aria-valuenow="50" tabindex="0" title="Drag to resize panels"></div>
+<section class="preview" aria-label="Preview">
+<div class="previewbar"><nav class="tabs" aria-label="Preview tabs"><button id="tab-template" class="active">Template</button><button id="tab-result" disabled>Result</button><button id="tab-errors">Errors <span class="count" id="error-count">5</span></button></nav><span class="spacer"></span><span class="status" id="preview-status"></span><button class="download" id="download" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg>Download</button></div>
+<div class="canvas" id="canvas"></div>
+</section>
+</main>
+<footer class="footer"><span class="project-links"><a href="https://github.com/montr/mr" target="_blank" rel="noopener noreferrer" title="MonoReport on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 .8A11.2 11.2 0 0 0 8.46 22.62c.56.1.77-.24.77-.54v-2.13c-3.13.68-3.79-1.33-3.79-1.33-.5-1.27-1.24-1.61-1.24-1.61-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 .1.78 1.4 3.27.95.1-.72.39-1.21.71-1.49-2.5-.29-5.13-1.25-5.13-5.54 0-1.23.44-2.23 1.16-3.02-.12-.28-.5-1.43.11-2.97 0 0 .94-.3 3.08 1.15a10.7 10.7 0 0 1 5.6 0c2.14-1.45 3.08-1.15 3.08-1.15.61 1.54.23 2.69.11 2.97.72.79 1.15 1.79 1.15 3.02 0 4.3-2.63 5.25-5.14 5.54.4.35.75 1.03.75 2.08v3.09c0 .3.21.65.78.54A11.2 11.2 0 0 0 12 .8Z"/></svg>MonoReport</a><a class="version" href="https://github.com/montr/mr/releases/tag/v0.0.1" target="_blank" rel="noopener noreferrer">v0.0.1</a></span><a href="/docs/" title="API documentation"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.3c-3.8-2-7-1.7-9-1.1v13.5c3-.9 6.2-.7 9 1 2.8-1.7 6-1.9 9-1V5.2c-2-.6-5.2-.9-9 1.1Zm0 0v13.4"/></svg>API docs</a></footer>
+<script>
+const $=id=>document.getElementById(id);
+const layout=document.querySelector('.layout');
+const splitter=$('splitter');
+let resizing=false;
+function setSplit(percent){
+  const width=layout.getBoundingClientRect().width;
+  if(width<=850)return;
+  const minLeft=Math.max(320/width*100,25);
+  const maxLeft=Math.min((width-367)/width*100,75);
+  if(maxLeft<minLeft)return;
+  const value=Math.max(minLeft,Math.min(maxLeft,percent));
+  layout.style.setProperty('--left-width',value+'%');
+  splitter.setAttribute('aria-valuenow',Math.round(value));
+}
+splitter.addEventListener('pointerdown',e=>{
+  if(window.innerWidth<=850)return;
+  resizing=true;splitter.classList.add('dragging');splitter.setPointerCapture(e.pointerId);
+});
+splitter.addEventListener('pointermove',e=>{
+  if(!resizing)return;
+  const r=layout.getBoundingClientRect();setSplit((e.clientX-r.left)/r.width*100);
+});
+function stopResize(){resizing=false;splitter.classList.remove('dragging')}
+splitter.addEventListener('pointerup',stopResize);
+splitter.addEventListener('pointercancel',stopResize);
+splitter.addEventListener('keydown',e=>{
+  if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;
+  e.preventDefault();
+  const current=parseFloat(getComputedStyle(layout).getPropertyValue('--left-width'))||45;
+  setSplit(current+(e.key==='ArrowRight'?3:-3));
+});
+const mobileSplitter=$('mobile-splitter');
+let resizingMobile=false;
+function setMobileSplit(percent){
+  if(window.innerWidth>850)return;
+  const height=layout.getBoundingClientRect().height;
+  const minPct=Math.max(160/height*100,20);
+  const maxPct=Math.min((height-168)/height*100,80);
+  if(maxPct<minPct)return;
+  const value=Math.max(minPct,Math.min(maxPct,percent));
+  layout.style.setProperty('--source-height',value+'%');
+  mobileSplitter.setAttribute('aria-valuenow',Math.round(value));
+}
+mobileSplitter.addEventListener('pointerdown',e=>{
+  if(window.innerWidth>850)return;
+  resizingMobile=true;mobileSplitter.classList.add('dragging');mobileSplitter.setPointerCapture(e.pointerId);
+});
+mobileSplitter.addEventListener('pointermove',e=>{
+  if(!resizingMobile)return;
+  const r=layout.getBoundingClientRect();setMobileSplit((e.clientY-r.top)/r.height*100);
+});
+function stopMobileResize(){resizingMobile=false;mobileSplitter.classList.remove('dragging')}
+mobileSplitter.addEventListener('pointerup',stopMobileResize);
+mobileSplitter.addEventListener('pointercancel',stopMobileResize);
+mobileSplitter.addEventListener('keydown',e=>{
+  if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;
+  e.preventDefault();
+  const current=parseFloat(getComputedStyle(layout).getPropertyValue('--source-height'))||50;
+  setMobileSplit(current+(e.key==='ArrowDown'?3:-3));
+});
+
+const defaultErrors=[
+ {title:'Unmatched collection region',detail:'TableStart:Items — no corresponding TableEnd found'},
+ {title:'Invalid nested field structure',detail:'Customer.Address — nested MERGEFIELD in field result'},
+ {title:'Unexpected collection end',detail:'TableEnd:Orders — collection region was not opened'},
+ {title:'Malformed field instruction',detail:'MERGEFIELD — missing field name'},
+ {title:'Invalid field boundary',detail:'Field boundary intersects an existing collection region'}
+];
+let file=null,resultReady=false,active='template',errors=defaultErrors.slice(),resultMarkup='';
+function html(v){return String(v).replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
+function jsonHighlighted(src){return html(src).replace(/(&quot;(?:\\.|[^&])*?&quot;)(\s*:)?|\b(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b|\b(true|false|null)\b/g,(all,str,colon,num,kw)=>str?'<span class="'+(colon?'token-key':'token-string')+'">'+str+'</span>'+(colon||''):num?'<span class="token-num">'+num+'</span>':'<span class="'+(kw==='null'?'token-null':'token-bool')+'">'+kw+'</span>')}
+function paintEditor(){const value=$('json').value;$('highlight').innerHTML=jsonHighlighted(value)+'\n';$('gutter').textContent=Array.from({length:value.split('\n').length},(_,i)=>i+1).join('\n')}
+function syncScroll(){ $('highlight').scrollTop=$('json').scrollTop;$('highlight').scrollLeft=$('json').scrollLeft;$('gutter').scrollTop=$('json').scrollTop}
+$('json').addEventListener('input',()=>{paintEditor();$('json-notice').textContent=''});$('json').addEventListener('scroll',syncScroll);
+$('json').addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();$('json').setRangeText('  ',$('json').selectionStart,$('json').selectionEnd,'end');paintEditor()}});
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('json').value);$('copy').textContent='Copied';setTimeout(()=>$('copy').textContent='Copy',1200)}catch(e){$('json-notice').textContent='Clipboard unavailable'}};
+$('format').onclick=()=>{try{$('json').value=JSON.stringify(JSON.parse($('json').value),null,2);$('json-notice').textContent='';paintEditor()}catch(e){$('json-notice').textContent=e.message}};
+const documentIcon='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg>';
+function empty(label){return '<div class="empty">'+documentIcon+'<br><strong>'+label+'</strong></div>'}
+function templateView(){if(!file)return empty('Select a template');return '<article class="paper"><h2>Document Template</h2><p><strong>'+html(file.name)+'</strong></p><p>This agreement is entered into on <span class="field">« Contract.Date »</span> by and between:</p><p><strong>Seller:</strong> <span class="field">« Seller.FullName »</span></p><p><strong>Buyer:</strong> <span class="field">« Buyer.FullName »</span></p><p>Amount: <span class="field">« Amount »</span></p><p style="margin-top:60px">Seller: ____________________</p><p>Buyer: ____________________</p></article>'}
+function issuesView(){if(!errors.length)return empty('No errors');return '<div class="issues"><div class="issues-top"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 7v6m0 4h.01"/></svg><strong>'+errors.length+' error'+(errors.length===1?'':'s')+'</strong></div>'+errors.map((e,i)=>'<div class="issue"><div class="issue-num">'+(i+1)+'.</div><div><strong>'+html(e.title)+'</strong><p>'+html(e.detail)+'</p></div></div>').join('')+'</div>'}
+function updateTabs(){$('canvas').classList.toggle('errors-view',active==='errors');['template','result','errors'].forEach(t=>$('tab-'+t).classList.toggle('active',active===t));$('tab-result').disabled=!resultReady;$('error-count').textContent=errors.length;$('error-count').classList.toggle('hidden',!errors.length);$('download').disabled=!resultReady;$('preview-status').textContent='';$('canvas').innerHTML=active==='template'?templateView():active==='result'?resultMarkup:issuesView()}
+function tab(t){if(t==='result'&&!resultReady)return;active=t;updateTabs()}
+$('tab-template').onclick=()=>tab('template');$('tab-result').onclick=()=>tab('result');$('tab-errors').onclick=()=>tab('errors');
+function setFile(f){if(!f)return;if(!/\.docx$/i.test(f.name)){errors=[{title:'Unsupported template format',detail:'Select a .docx file'}];tab('errors');return}file=f;$('filename').textContent=f.name;$('clear').classList.remove('hidden');resultReady=false;errors=[];tab('template')}
+// Dropping a DOCX on the preview selects it exactly like the Select button.
+const previewDrop=$('canvas');
+function containsFileDrag(event){return Array.from(event.dataTransfer?.types||[]).includes('Files')}
+previewDrop.addEventListener('dragenter',event=>{if(!containsFileDrag(event))return;event.preventDefault();previewDrop.classList.add('drop-target')});
+previewDrop.addEventListener('dragover',event=>{if(!containsFileDrag(event))return;event.preventDefault();event.dataTransfer.dropEffect='copy';previewDrop.classList.add('drop-target')});
+previewDrop.addEventListener('dragleave',event=>{if(!previewDrop.contains(event.relatedTarget))previewDrop.classList.remove('drop-target')});
+previewDrop.addEventListener('drop',event=>{event.preventDefault();previewDrop.classList.remove('drop-target');const dropped=event.dataTransfer?.files?.[0];if(dropped)setFile(dropped)});
+window.addEventListener('drop',event=>{if(containsFileDrag(event))event.preventDefault()});
+window.addEventListener('dragover',event=>{if(containsFileDrag(event))event.preventDefault()});
+$('choose').onclick=()=>$('file').click();$('file').onchange=e=>setFile(e.target.files[0]);$('clear').onclick=()=>{file=null;resultReady=false;errors=[];$('file').value='';$('filename').textContent='No file selected';$('clear').classList.add('hidden');tab('template')};
+function generateDocument(){errors=[];$('json-notice').textContent='';if(!file){errors=[{title:'Template is required',detail:'Select a DOCX file before generating a document'}];tab('errors');return}let data;try{data=JSON.parse($('json').value)}catch(e){errors=[{title:'Invalid JSON',detail:e.message}];$('json-notice').textContent='Invalid JSON';tab('errors');return}if(data&&data.errors){errors=defaultErrors.slice();tab('errors');return}const rows=[];function flatten(v,p='',depth=0){if(depth>5||rows.length>12)return;if(v!==null&&typeof v==='object'&&!Array.isArray(v)){for(const [k,val] of Object.entries(v))flatten(val,p?p+'.'+k:k,depth+1)}else rows.push('<p><strong>'+html(p)+':</strong> '+html(JSON.stringify(v))+'</p>')}flatten(data);resultMarkup='<article class="paper"><h2>Generated Document</h2><p>Document based on <strong>'+html(file.name)+'</strong></p>'+(rows.join('')||'<p>No values supplied.</p>')+'</article>';resultReady=true;tab('result')}
+$('generate').onclick=generateDocument;
+$('download').onclick=()=>{if(resultReady)alert('DOCX downloading will work when the UI is connected to MonoReport.Api.');};
+paintEditor();tab('template');
+</script>
+</body></html>
