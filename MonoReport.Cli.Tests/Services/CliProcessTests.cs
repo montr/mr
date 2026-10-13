@@ -50,7 +50,7 @@ public sealed class CliProcessTests
     public async Task Real_entry_point_rejects_invalid_templates_without_partial_or_overwritten_outputs(bool nested, string mode)
     {
         var directory = EvidenceDirectory();
-        var template = nested ? Docx.Create(Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE"))) : Docx.Create(RegionTests.ConflictingLayout("paragraph"));
+        var template = nested ? Docx.Create(Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE"))) : Docx.Create(Docx.ConflictingLayout("paragraph"));
         Docx.AssertValid(template);
         var path = Path.Combine(directory, "invalid.docx");
         var output = Path.Combine(directory, "result.docx");

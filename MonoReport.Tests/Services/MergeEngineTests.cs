@@ -28,7 +28,7 @@ namespace MonoReport.Tests.Services
         [MemberData(nameof(InvalidStories))]
         public void Every_original_story_is_preflighted_before_any_formatter_or_empty_region(string part, bool nested)
         {
-            var invalid = nested ? new[] { Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE")) } : RegionTests.ConflictingLayout("paragraph");
+            var invalid = nested ? new[] { Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE")) } : Docx.ConflictingLayout("paragraph");
             var template = Docx.CreateStories(part, invalid);
             Docx.AssertValid(template);
             var observer = new ObserveFormatter();
@@ -48,7 +48,7 @@ namespace MonoReport.Tests.Services
         [InlineData(false)]
         public void Preflight_rejection_never_mutates_original_xml(bool nested)
         {
-            var invalid = nested ? new[] { Docx.P(Docx.NestedResult(true, false, "MERGEFIELD Name", "PAGE")) } : RegionTests.ConflictingLayout("boundary-paragraph");
+            var invalid = nested ? new[] { Docx.P(Docx.NestedResult(true, false, "MERGEFIELD Name", "PAGE")) } : Docx.ConflictingLayout("boundary-paragraph");
             var xml = Docx.Read(Docx.Create(new[] { Docx.P(Docx.Field("MERGEFIELD Earlier")) }.Concat(invalid).ToArray()));
             var snapshot = new XDocument(xml);
             var renderer = new DocumentRenderer(new DataResolver(), new OoxmlFieldParser(new FieldCodeParser()), new RegionParser(), new ValueFormatter(new FormatterRegistry(new Dictionary<string,IValueFormatter>())), new CachedResultWriter());

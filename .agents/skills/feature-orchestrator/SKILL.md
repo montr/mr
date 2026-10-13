@@ -27,6 +27,6 @@ description: Coordinate feature discussion, approved specification, planning, im
 
 ## Resource discipline
 
-1. Read only relevant files/sections/diffs and valid prior evidence. Keep handoffs and reports concise, with paths, results, decisions, and outstanding work.
+1. Read only relevant files/sections/diffs and valid prior evidence. Keep handoffs and feature review updates delta-based: decision, changed behavior, findings, verification, limitations, next action. Record each approval once; retain audit history without repeating boilerplate.
 2. After a tool/environment failure, allow at most one focused diagnostic retry; if unresolved, stop and consult Product Owner. Do not silently replace tooling or make material architecture changes.
 3. Never invent token usage or remaining Codex quotas. Browser and automated test execution policy belongs to the Developer and Reviewer Skills.

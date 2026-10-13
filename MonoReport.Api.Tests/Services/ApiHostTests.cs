@@ -8,6 +8,7 @@ namespace MonoReport.Tests.Services;
 public sealed class ApiHostTests
 {
     [Fact]
+    [Trait("Category", "RealHost")]
     public async Task Real_kestrel_enforces_whole_request_bound_including_streamed_requests_and_recovers()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start();

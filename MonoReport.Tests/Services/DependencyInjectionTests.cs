@@ -202,7 +202,7 @@ public sealed class DependencyInjectionTests
     [InlineData(false)]
     public void Di_preserves_actionable_preflight_rejections(bool nested)
     {
-        var template = nested ? Docx.Create(Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE"))) : Docx.Create(RegionTests.ConflictingLayout("paragraph"));
+        var template = nested ? Docx.Create(Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE"))) : Docx.Create(Docx.ConflictingLayout("paragraph"));
         using var provider = Build(new ServiceCollection().AddMonoReport());
         using var stream = new MemoryStream(template);
         using var data = JsonDocument.Parse("{\"Name\":\"replacement\",\"A\":[{}],\"B\":[{}]}");

@@ -3,16 +3,34 @@
 MonoReport generates DOCX documents from Microsoft Word templates and JSON data. It preserves Word fields and formatting, repeats collection regions, and supports custom value formatters. It requires .NET SDK 10; Microsoft Word is needed to edit or inspect templates, not to run the engine.
 
 1. `MonoReport` is the library.
-2. `MonoReport.Cli` is the command-line application.
+2. `MonoReport.Cli` is the command-line application and `monoreport` .NET tool package.
 3. `MonoReport.Api` is the separate ASP.NET Core HTTP application. It references Core; Core and CLI have no HTTP dependencies.
-4. `MonoReport.Tests` contains the automated tests, including Open XML validation, actual CLI processes, HTTP integration, OpenAPI, and real Kestrel host checks.
+4. `MonoReport.Tests` contains Core and Open XML tests.
+5. `MonoReport.Cli.Tests` contains CLI service and real-process tests.
+6. `MonoReport.Api.Tests` contains HTTP integration, generated OpenAPI contract, and real Kestrel host tests.
 
-Build and test from the repository root:
+Build and test from the repository root. These single-line commands work in macOS/Linux Bash or zsh, Windows PowerShell, and Windows CMD:
 
 ```bash
 dotnet build MonoReport.slnx -c Release
 dotnet test MonoReport.slnx -c Release
 ```
+
+The normal solution test command runs Core, CLI, and `WebApplicationFactory` HTTP integration tests, including generated OpenAPI contract coverage. `MonoReport.Api.Tests` automatically excludes the `RealHost` category because those tests start real Kestrel processes. Run that category explicitly when needed. On macOS/Linux Bash or zsh:
+
+```bash
+dotnet test MonoReport.Api.Tests/MonoReport.Api.Tests.csproj -c Release \
+  -p:VSTestTestCaseFilter=Category=RealHost
+```
+
+On Windows PowerShell:
+
+```powershell
+dotnet test MonoReport.Api.Tests/MonoReport.Api.Tests.csproj -c Release `
+  -p:VSTestTestCaseFilter=Category=RealHost
+```
+
+Browser/Playwright verification is a separate manual workflow and is not part of the normal local test run.
 
 ![Word template, JSON data, and generated construction estimate](.docs/Template%20to%20JSON%20to%20Document%20Workflow.png)
 
@@ -54,11 +72,19 @@ Issues have stable `code`, safe `message`, and explicit nullable `field`, `part`
 
 ## HTTP API
 
-Build from the repository root with .NET SDK 10 and start the separate host:
+Build from the repository root with .NET SDK 10 and start the separate host. On macOS/Linux Bash or zsh:
 
 ```bash
 ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://127.0.0.1:5080 \
   dotnet run --project MonoReport.Api/MonoReport.Api.csproj -c Release --no-build
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = 'Development'
+$env:ASPNETCORE_URLS = 'http://127.0.0.1:5080'
+dotnet run --project MonoReport.Api/MonoReport.Api.csproj -c Release --no-build
 ```
 
 OpenAPI JSON is at `http://127.0.0.1:5080/openapi/v1.json`; Swagger UI interactive documentation is at `http://127.0.0.1:5080/docs`. Both are enabled by default in every environment after an ordinary API start. Set `MonoReport__DocumentationEnabled=false` to disable both routes or `true` to enable them explicitly, independently of the environment. The host supplies no authentication scheme. Scalar was evaluated first, but its multipart client did not produce a valid upload request with the selected generated contract, so Feature 003 uses the approved Swagger UI fallback.
@@ -67,7 +93,7 @@ OpenAPI JSON is at `http://127.0.0.1:5080/openapi/v1.json`; Swagger UI interacti
 2. Generation success returns HTTP 200 with raw DOCX bytes, DOCX media type, and attachment filename `document.docx`. `X-MonoReport-Warning-Count` exists only when warnings exist; the default missing-value policy remains empty without warnings. There is no JSON response envelope or success flag.
 3. `POST /api/documents/validate` accepts exactly one nonempty DOCX file `template`. Additional inputs, including data and culture, fail. It directly calls Core validation. Completed validation returns HTTP 200 JSON even for invalid nonempty DOCX content, with `valid`, `errors`, and `warnings`. Both arrays and all nullable issue properties are always present. Empty uploads are request errors.
 
-Generate the sample and save its raw response:
+Generate the sample and save its raw response on macOS/Linux Bash or zsh. `-o` writes the binary DOCX directly to a file:
 
 ```bash
 curl --fail-with-body http://127.0.0.1:5080/api/documents/generate \
@@ -76,7 +102,7 @@ curl --fail-with-body http://127.0.0.1:5080/api/documents/generate \
   --form-string 'culture=en-GB' -o /tmp/monoreport-generated.docx
 ```
 
-Validate the sample without JSON or culture:
+Validate the sample without JSON or culture on macOS/Linux Bash or zsh:
 
 ```bash
 curl --fail-with-body http://127.0.0.1:5080/api/documents/validate \
@@ -219,7 +245,25 @@ A shared registry supports concurrent reads after configuration, not registratio
 
 ## Command-line application
 
-The CLI uses the same DI registration as library consumers. Invoke its built DLL to keep build messages out of binary output.
+The CLI uses the same DI registration as library consumers and is packaged as the `monoreport` .NET tool. To pack and install it locally into an isolated directory on macOS/Linux Bash or zsh:
+
+```bash
+dotnet pack MonoReport.Cli/MonoReport.Cli.csproj -c Release -o ./artifacts/packages
+dotnet tool install --tool-path ./artifacts/tools MonoReport.Cli \
+  --source ./artifacts/packages
+./artifacts/tools/monoreport --help
+```
+
+On Windows PowerShell:
+
+```powershell
+dotnet pack MonoReport.Cli/MonoReport.Cli.csproj -c Release -o .\artifacts\packages
+dotnet tool install --tool-path .\artifacts\tools MonoReport.Cli `
+  --source .\artifacts\packages
+.\artifacts\tools\monoreport.exe --help
+```
+
+Remove `artifacts` when the isolated package and installation are no longer needed. The built DLL remains directly executable for development and troubleshooting.
 
 1. `--template <path>` / `-t <path>` supplies the required DOCX template.
 2. `--output <path>` / `-o <path>` writes a file after a successful merge. Omit it or use `-` for binary stdout. Existing files are overwritten only after rendering succeeds.
@@ -232,9 +276,10 @@ The CLI uses the same DI registration as library consumers. Invoke its built DLL
 
 `--validate --template <path>` (or `-t <path>`) directly invokes the same injected Core validator as the HTTP endpoint. Only these options are accepted in validation mode; JSON sources, stdin, culture, output, generation options, positional inputs and duplicates are argument errors. `--help` retains precedence. Validation never reads stdin, performs a merge, or writes DOCX bytes.
 
+On macOS/Linux Bash or zsh, and on Windows after the tool directory is on `PATH`:
+
 ```bash
-dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll \
-  --validate --template Samples/sample.template.docx
+monoreport --validate --template Samples/sample.template.docx
 ```
 
 To validate an invalid template, replace the template path with the document to inspect. Exit `0` means valid; exit `1` means invalid template or operational execution failure; exit `2` means invalid arguments. Completed validation writes exactly one JSON result to stdout with the same structure, issue codes/messages/context, nulls, ordering and warnings as HTTP validation. Invalid/corrupt/readable empty local files produce invalid JSON and exit 1 without operational stderr; empty HTTP uploads instead return 400. Missing/unreadable files and unexpected execution/output failures produce safe operational diagnostics on stderr and exit 1. Failures before writing leave stdout empty; an output stream failure can interrupt JSON. Caller-owned stdin/stdout stay open. Generation behavior remains unchanged when `--validate` is absent.
@@ -243,63 +288,61 @@ To validate an invalid template, replace the template path with the document to 
 
 `Samples` contains `sample.template.docx`, `sample.json`, and `sample.docx`. The estimate identifies the Riverside Community Centre in Moscow and Northwind Construction LLC, repeats three material lines, and totals RUB 125,430.50. Labels and source data are English; the generated RUB amount in words is Russian. Quantities, prices, line totals, and summaries are supplied in JSON; MonoReport does not calculate business values.
 
-Run commands from the repository root. Build once:
+Run commands from the repository root. This single-line build command works in macOS/Linux Bash or zsh, Windows PowerShell, and Windows CMD:
 
 ```bash
 dotnet build MonoReport.Cli/MonoReport.Cli.csproj -c Release
 ```
 
-Generate from a JSON file in Bash:
+Generate from a JSON file on macOS/Linux Bash or zsh:
 
 ```bash
-dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll \
-  --template Samples/sample.template.docx \
+monoreport --template Samples/sample.template.docx \
   --json-file Samples/sample.json \
   --output sample.docx \
   --culture en-GB
 ```
 
-Pass inline JSON in Bash:
+Pass inline JSON on macOS/Linux Bash or zsh:
 
 ```bash
-dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll \
-  --template Samples/sample.template.docx \
+monoreport --template Samples/sample.template.docx \
   --json "$(cat Samples/sample.json)" \
   --output sample.docx \
   --culture en-GB
 ```
 
-Read stdin and redirect binary stdout in Bash:
+Read stdin and redirect binary stdout on macOS/Linux Bash or zsh. These shells preserve binary stdout when redirecting it to a file:
 
 ```bash
-dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll \
-  --template Samples/sample.template.docx \
+monoreport --template Samples/sample.template.docx \
   --culture en-GB \
   < Samples/sample.json > sample.docx
 ```
 
-Read UTF-8 stdin and write a file in PowerShell:
+On Windows PowerShell, read UTF-8 stdin and use `--output` so DOCX bytes are written directly by MonoReport:
 
 ```powershell
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-Get-Content -Raw -Encoding UTF8 Samples/sample.json |
-  dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll `
+Get-Content -Raw -Encoding UTF8 Samples/sample.json | `
+  monoreport `
     --template Samples/sample.template.docx `
     --stdin `
     --output sample.docx `
     --culture en-GB
 ```
 
-Read stdin and redirect binary stdout in `cmd.exe`:
+On Windows CMD, use caret (`^`) only for CMD line continuation. Read stdin and use `--output` instead of redirecting binary stdout:
 
 ```cmd
-dotnet MonoReport.Cli/bin/Release/net10.0/MonoReport.Cli.dll ^
-  --template Samples/sample.template.docx ^
+monoreport --template Samples/sample.template.docx ^
+  --stdin ^
   --culture en-GB ^
-  < Samples/sample.json > sample.docx
+  --output sample.docx ^
+  < Samples\sample.json
 ```
 
-Windows PowerShell 5.1 text redirection is unsuitable for binary DOCX; use `--output`. With unredirected stdin, finish your JSON input with EOF so generation can proceed.
+Windows PowerShell 5.1 text redirection is unsuitable for binary DOCX; use `--output`. PowerShell versions do not all handle native binary stdout redirection identically, so `--output` is the portable Windows choice. With unredirected stdin, finish your JSON input with EOF so generation can proceed.
 
 ## Current limitations
 

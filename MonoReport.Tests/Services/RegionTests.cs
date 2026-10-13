@@ -7,24 +7,6 @@ namespace MonoReport.Tests.Services
 {
     public sealed class RegionTests
     {
-        internal static XElement[] ConflictingLayout(string layout, string secondName = "B")
-        {
-            var startA = Docx.Field("MERGEFIELD TableStart:A");
-            var endA = Docx.Field("MERGEFIELD TableEnd:A");
-            var startB = Docx.Field("MERGEFIELD TableStart:" + secondName);
-            var endB = Docx.Field("MERGEFIELD TableEnd:" + secondName);
-            return layout switch
-            {
-                "paragraph" => new[] { Docx.P(startA, endA, startB, endB) },
-                "row" => new[] { Docx.Table(Docx.Row(startA, endA, startB, endB)) },
-                "boundary-paragraph" => new[] { Docx.P(startA), Docx.P(endA, startB), Docx.P(endB) },
-                "boundary-row" => new[] { Docx.Table(Docx.Row(startA), Docx.Row(endA, startB), Docx.Row(endB)) },
-                "ancestor-paragraph" => new[] { Docx.Table(new XElement(WordXml.TableRowElementName, new XElement(WordXml.TableCellElementName, Docx.P(startA, endA), Docx.P(startB, endB)))) },
-                "ancestor-table" => new[] { Docx.Table(new XElement(WordXml.TableRowElementName, new XElement(WordXml.TableCellElementName, Docx.P(startA, endA), Docx.Table(Docx.Row(startB, endB)), Docx.P()))) },
-                _ => throw new ArgumentException(layout)
-            };
-        }
-
         public static IEnumerable<object[]> ConflictingCases()
         {
             foreach (var layout in new[] { "paragraph", "row", "boundary-paragraph", "boundary-row", "ancestor-paragraph", "ancestor-table" })
@@ -37,7 +19,7 @@ namespace MonoReport.Tests.Services
         public void Independent_footprint_conflicts_have_original_context_and_preserve_input(string layout, bool sameName)
         {
             var second = sameName ? "A" : "B";
-            var template = Docx.Create(ConflictingLayout(layout, second));
+            var template = Docx.Create(Docx.ConflictingLayout(layout, second));
             Docx.AssertValid(template);
             var engine = Docx.CreateEngine();
             using var input = new MemoryStream(template);
@@ -76,7 +58,7 @@ namespace MonoReport.Tests.Services
         {
             var contents = new List<XElement>();
             for (var i = 0; i < depth; i++) contents.Add(Docx.P(Docx.Field("MERGEFIELD TableStart:Parent")));
-            contents.AddRange(ConflictingLayout("paragraph"));
+            contents.AddRange(Docx.ConflictingLayout("paragraph"));
             for (var i = 0; i < depth; i++) contents.Add(Docx.P(Docx.Field("MERGEFIELD TableEnd:Parent")));
             var template = Docx.Create(contents.ToArray());
             Docx.AssertValid(template);

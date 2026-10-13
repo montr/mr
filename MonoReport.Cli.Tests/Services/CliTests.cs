@@ -26,7 +26,7 @@ namespace MonoReport.Tests.Services
         [InlineData(false, "existing")]
         public void Invalid_template_rejection_preserves_streams_and_output_files(bool nested, string mode)
         {
-            var template = nested ? Docx.Create(Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE"))) : Docx.Create(RegionTests.ConflictingLayout("paragraph"));
+            var template = nested ? Docx.Create(Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE"))) : Docx.Create(Docx.ConflictingLayout("paragraph"));
             Docx.AssertValid(template);
             var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             Directory.CreateDirectory(directory);

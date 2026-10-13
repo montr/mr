@@ -85,6 +85,24 @@ namespace MonoReport.Tests.Services
 
         internal static XElement Table(params XElement[] rows) => new(WordXml.TableElementName, new XElement(WordXml.TablePropertiesElementName), new XElement(WordXml.TableGridElementName, Enumerable.Range(0, 3).Select(_ => new XElement(WordXml.GridColumnElementName, new XAttribute(WordXml.WidthAttributeName, "2000")))), rows);
 
+        internal static XElement[] ConflictingLayout(string layout, string secondName = "B")
+        {
+            var startA = Field("MERGEFIELD TableStart:A");
+            var endA = Field("MERGEFIELD TableEnd:A");
+            var startB = Field("MERGEFIELD TableStart:" + secondName);
+            var endB = Field("MERGEFIELD TableEnd:" + secondName);
+            return layout switch
+            {
+                "paragraph" => [P(startA, endA, startB, endB)],
+                "row" => [Table(Row(startA, endA, startB, endB))],
+                "boundary-paragraph" => [P(startA), P(endA, startB), P(endB)],
+                "boundary-row" => [Table(Row(startA), Row(endA, startB), Row(endB))],
+                "ancestor-paragraph" => [Table(new XElement(WordXml.TableRowElementName, new XElement(WordXml.TableCellElementName, P(startA, endA), P(startB, endB))))],
+                "ancestor-table" => [Table(new XElement(WordXml.TableRowElementName, new XElement(WordXml.TableCellElementName, P(startA, endA), Table(Row(startB, endB)), P())))],
+                _ => throw new ArgumentException(layout)
+            };
+        }
+
         internal static XElement Properties() => new(WordXml.RunPropertiesElementName, new XElement(WordXml.RunFontsElementName, new XAttribute(WordXml.AsciiFontAttributeName, "Arial"), new XAttribute(WordXml.HighAnsiFontAttributeName, "Arial")), new XElement(WordXml.BoldElementName), new XElement(WordXml.ItalicElementName), new XElement(WordXml.ColorElementName, new XAttribute(WordXml.ValueAttributeName, "FF0000")), new XElement(WordXml.FontSizeElementName, new XAttribute(WordXml.ValueAttributeName, "28")), new XElement(WordXml.HighlightElementName, new XAttribute(WordXml.ValueAttributeName, "yellow")), new XElement(WordXml.UnderlineElementName, new XAttribute(WordXml.ValueAttributeName, WordXml.SingleUnderlineValue)), new XElement(WordXml.LanguageElementName, new XAttribute(WordXml.ValueAttributeName, "ru-RU")));
 
         internal static byte[] Create(params XElement[] content)

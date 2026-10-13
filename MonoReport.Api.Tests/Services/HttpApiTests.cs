@@ -117,7 +117,7 @@ public sealed class HttpApiTests
             "syntax" => Docx.Create(Docx.P(Docx.Field("MERGEFIELD"))),
             "structure" => Docx.Create(Docx.P(new System.Xml.Linq.XElement(WordXml.RunElementName, Docx.Character("end")))),
             "region" => Docx.Create(Docx.P(Docx.Field("MERGEFIELD TableEnd:Items"))),
-            "overlap" => Docx.Create(RegionTests.ConflictingLayout("paragraph")),
+            "overlap" => Docx.Create(Docx.ConflictingLayout("paragraph")),
             _ => Docx.Create(Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE")))
         };
         if (kind == "region")

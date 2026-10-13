@@ -24,6 +24,11 @@
 3. Prefer primary constructors with null validation (`?? throw`); use regular constructors when required by correct initialization.
 4. Isolate DOCX-specific logic from shared APIs in anticipation of other formats such as XLSX, without premature abstractions or unapproved formats.
 
+## Test Quality
+
+1. Favor meaningful behavior-focused tests over raw test count or pass-rate targets. Verify acceptance criteria with assertions capable of detecting plausible defects; avoid redundant tests and coverage-number chasing.
+2. Code coverage metrics may inform future gap analysis but are not quality targets; do not introduce coverage tooling or thresholds without separate Product Owner approval.
+
 ## Documentation Rules
 
 1. Write Skills, project rules, specifications, plans, decisions, and other project documentation in English; Product Owner discussions may use another language.

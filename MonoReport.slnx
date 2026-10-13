@@ -1,6 +1,8 @@
 <Solution>
   <Project Path="MonoReport.Cli/MonoReport.Cli.csproj" />
+  <Project Path="MonoReport.Cli.Tests/MonoReport.Cli.Tests.csproj" />
   <Project Path="MonoReport.Api/MonoReport.Api.csproj" />
+  <Project Path="MonoReport.Api.Tests/MonoReport.Api.Tests.csproj" />
   <Project Path="MonoReport.Tests/MonoReport.Tests.csproj" />
   <Project Path="MonoReport/MonoReport.csproj" />
 </Solution>

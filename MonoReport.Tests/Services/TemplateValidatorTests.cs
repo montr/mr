@@ -75,7 +75,7 @@ public sealed class TemplateValidatorTests
             "syntax" => [Docx.P(Docx.Field("MERGEFIELD"))],
             "structure" => [Docx.P(new XElement(WordXml.RunElementName, Docx.Character("end")))],
             "region" => [Docx.P(Docx.Field("MERGEFIELD TableEnd:Items"))],
-            "overlap" => RegionTests.ConflictingLayout("paragraph"),
+            "overlap" => Docx.ConflictingLayout("paragraph"),
             _ => [Docx.P(Docx.NestedResult(false, false, "MERGEFIELD Name", "PAGE"))]
         };
         var issue = Assert.Single(Validate(Docx.Create(content)).Errors);
@@ -96,8 +96,8 @@ public sealed class TemplateValidatorTests
             Docx.Table(Docx.Row(Docx.Field("MERGEFIELD TableStart:BoundaryB"))),
             Docx.P(Docx.Field("MERGEFIELD TableEnd:BoundaryB"))
         };
-        content.AddRange(RegionTests.ConflictingLayout("paragraph", "OverlapB"));
-        content.AddRange(RegionTests.ConflictingLayout("paragraph", "OverlapD"));
+        content.AddRange(Docx.ConflictingLayout("paragraph", "OverlapB"));
+        content.AddRange(Docx.ConflictingLayout("paragraph", "OverlapD"));
         var bytes = Docx.Create(content.ToArray());
 
         var result = Validate(bytes);

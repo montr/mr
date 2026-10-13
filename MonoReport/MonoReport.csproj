@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="MonoReport.Tests" />
+    <InternalsVisibleTo Include="MonoReport.Cli.Tests" />
+    <InternalsVisibleTo Include="MonoReport.Api.Tests" />
   </ItemGroup>
 
 </Project>
