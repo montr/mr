@@ -1,5 +1,6 @@
-﻿**/bin/
+**/bin/
 **/obj/
 .idea
 .vs/
 TestResults/
+*.user

@@ -9,10 +9,10 @@ namespace MonoReport.Services
         {
             var errors = Inspect(fields);
             if (errors.Count != 0)
-                throw errors[0];
+                throw errors[0].ToException();
         }
 
-        internal IReadOnlyList<TemplateException> Inspect(IReadOnlyList<FieldReference> fields)
+        internal IReadOnlyList<StructuralDiagnostic> Inspect(IReadOnlyList<FieldReference> fields)
         {
             var stack = new Stack<(FieldReference Start, int Index)>();
             var matched = new List<(Region Region, FieldReference? Parent)>();
@@ -30,17 +30,18 @@ namespace MonoReport.Services
             }
             if (stack.TryPeek(out var unmatched)) return [Error(unmatched.Start, "start without end")];
 
-            var errors = new List<TemplateException>();
+            var errors = new List<StructuralDiagnostic>();
             var footprints = new List<(Region Region, FieldReference? Parent, XElement[] Blocks)>();
             foreach (var item in matched.OrderBy(x => x.Region.First))
             {
-                try
+                var blocks = InspectBlocks(item.Region);
+                if (blocks.Diagnostic is null)
                 {
-                    var (first, last) = GetBlocks(item.Region);
-                    var blocks = first.Parent!.Elements().SkipWhile(n => n != first).TakeWhile(n => n != last).Append(last).ToArray();
-                    footprints.Add((item.Region, item.Parent, blocks));
+                    var (first, last) = blocks.Blocks!.Value;
+                    var footprint = first.Parent!.Elements().SkipWhile(n => n != first).TakeWhile(n => n != last).Append(last).ToArray();
+                    footprints.Add((item.Region, item.Parent, footprint));
                 }
-                catch (TemplateException error) { errors.Add(error); }
+                else errors.Add(blocks.Diagnostic);
             }
             for (var i = 0; i < footprints.Count; i++)
             {
@@ -51,10 +52,10 @@ namespace MonoReport.Services
                     if (!ReferenceEquals(a.Parent, b.Parent)) continue;
                     if (!a.Blocks.Any(left => b.Blocks.Any(right => left == right || left.Ancestors().Contains(right) || right.Ancestors().Contains(left)))) continue;
                     var location = a.Region.Start.ContextLocation;
-                    errors.Add(new TemplateException($"Independent regions '{a.Region.Start.Field.Collection}' ({location}) and '{b.Region.Start.Field.Collection}' ({b.Region.Start.ContextLocation}) have an unsupported shared/overlapping-block layout. Place independent regions in separate supported paragraph or table-row ranges with no shared boundary block.", a.Region.Start.Field.Collection, a.Region.Start.Field.Code, location, code: "template.overlapping_regions"));
+                    errors.Add(new("template.overlapping_regions", $"Independent regions '{a.Region.Start.Field.Collection}' ({location}) and '{b.Region.Start.Field.Collection}' ({b.Region.Start.ContextLocation}) have an unsupported shared/overlapping-block layout. Place independent regions in separate supported paragraph or table-row ranges with no shared boundary block.", a.Region.Start.Field.Collection, a.Region.Start.Field.Code, location));
                 }
             }
-            return errors.DistinctBy(error => (error.Code, error.Field, error.FieldCode, error.Location)).ToArray();
+            return errors;
         }
 
         public IReadOnlyList<Region> Parse(IReadOnlyList<FieldReference> fields)
@@ -72,12 +73,12 @@ namespace MonoReport.Services
                 {
                     if (stack.TryPop(out var start) == false)
                     {
-                        throw Error(field, "end without start");
+                        throw Error(field, "end without start").ToException();
                     }
 
                     if (start.Field.Field.Collection != field.Field.Collection)
                     {
-                        throw Error(field, $"end does not match start '{start.Field.Field.Collection}'");
+                        throw Error(field, $"end does not match start '{start.Field.Field.Collection}'").ToException();
                     }
 
                     if (stack.Count == 0)
@@ -89,15 +90,22 @@ namespace MonoReport.Services
 
             if (stack.TryPeek(out var unmatched))
             {
-                throw Error(unmatched.Field, "start without end");
+                throw Error(unmatched.Field, "start without end").ToException();
             }
 
             return outer;
         }
 
-        public TemplateException Error(FieldReference field, string message) => new($"Region '{field.Field.Collection}': {message} ({field.Location}).", field.Field.Collection, field.Field.Code, field.Location, code: "template.invalid_region");
+        private static StructuralDiagnostic Error(FieldReference field, string message) => new("template.invalid_region", $"Region '{field.Field.Collection}': {message} ({field.Location}).", field.Field.Collection, field.Field.Code, field.Location);
 
         public (XElement First, XElement Last) GetBlocks(Region region)
+        {
+            var inspection = InspectBlocks(region);
+            if (inspection.Diagnostic is not null) throw inspection.Diagnostic.ToException();
+            return inspection.Blocks!.Value;
+        }
+
+        private static ((XElement First, XElement Last)? Blocks, StructuralDiagnostic? Diagnostic) InspectBlocks(Region region)
         {
             // Prefer complete rows, including when markers are in different cells of one row.
             var firstRows = region.Start.Anchor.Ancestors(WordXml.TableRowElementName);
@@ -106,7 +114,7 @@ namespace MonoReport.Services
                 var last = region.End.Anchor.Ancestors(WordXml.TableRowElementName).FirstOrDefault(x => x.Parent == first.Parent);
                 if (last is not null)
                 {
-                    return (first, last);
+                    return ((first, last), null);
                 }
             }
 
@@ -114,10 +122,10 @@ namespace MonoReport.Services
             var lastParagraph = region.End.Anchor.Ancestors(WordXml.ParagraphElementName).FirstOrDefault();
             if (firstParagraph is not null && lastParagraph is not null && firstParagraph.Parent == lastParagraph.Parent)
             {
-                return (firstParagraph, lastParagraph);
+                return ((firstParagraph, lastParagraph), null);
             }
 
-            throw Error(region.Start, "markers must delimit sibling table rows or paragraphs");
+            return (null, Error(region.Start, "markers must delimit sibling table rows or paragraphs"));
         }
     }
 }

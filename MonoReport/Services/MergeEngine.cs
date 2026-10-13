@@ -34,8 +34,8 @@ namespace MonoReport.Services
                     var stories = _storyReader.Read(document);
                     foreach (var (part, xml) in stories)
                     {
-                        var error = _structureValidator.ValidateErrors(xml.Root!, part.Uri.ToString()).FirstOrDefault();
-                        if (error is not null) throw error;
+                        var error = _structureValidator.Inspect(xml.Root!, part.Uri.ToString()).FirstOrDefault();
+                        if (error is not null) throw error.ToException();
                     }
 
                     foreach (var (part, xml) in stories)

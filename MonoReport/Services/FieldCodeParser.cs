@@ -7,21 +7,30 @@ namespace MonoReport.Services
     {
         public MergeField? Parse(string code, string location)
         {
+            var inspection = Inspect(code, location);
+            if (inspection.Diagnostic is not null) throw inspection.Diagnostic.ToException();
+            return inspection.Field;
+        }
+
+        internal FieldCodeInspection Inspect(string code, string location)
+        {
             var trimmed = code.TrimStart().TrimStart('{').TrimStart();
             if (trimmed.StartsWith(WordFieldCodes.MergeField, StringComparison.OrdinalIgnoreCase) == false || (trimmed.Length > WordFieldCodes.MergeField.Length && char.IsWhiteSpace(trimmed[WordFieldCodes.MergeField.Length]) == false))
             {
-                return null;
+                return new(null, null);
             }
 
-            var tokens = Tokenize(code, location);
+            var tokenization = Tokenize(code, location);
+            if (tokenization.Diagnostic is not null) return new(null, tokenization.Diagnostic);
+            var tokens = tokenization.Tokens!;
             if (tokens.Count == 0 || tokens[0].Equals(WordFieldCodes.MergeField, StringComparison.OrdinalIgnoreCase) == false)
             {
-                return null;
+                return new(null, null);
             }
 
             if (tokens.Count < 2 || string.IsNullOrWhiteSpace(tokens[1]) || tokens[1].StartsWith('\\'))
             {
-                throw new TemplateException("MERGEFIELD has no field name.", fieldCode: code, location: location, code: "template.invalid_field_syntax");
+                return Invalid("MERGEFIELD has no field name.", fieldCode: code);
             }
 
             var switches = new List<FieldSwitch>();
@@ -29,7 +38,7 @@ namespace MonoReport.Services
             {
                 if (i + 1 >= tokens.Count || tokens[i].StartsWith('\\') == false)
                 {
-                    throw new TemplateException("Invalid field switch.", tokens[1], code, location, code: "template.invalid_field_syntax");
+                    return Invalid("Invalid field switch.", tokens[1], code);
                 }
 
                 switches.Add(new(tokens[i], tokens[i + 1]));
@@ -38,13 +47,16 @@ namespace MonoReport.Services
             var field = new MergeField(tokens[1], code, switches);
             if (field.IsRegion && string.IsNullOrWhiteSpace(field.Collection))
             {
-                throw new TemplateException("Region has no collection name.", field.Name, code, location, code: "template.invalid_field_syntax");
+                return Invalid("Region has no collection name.", field.Name, code);
             }
 
-            return field;
+            return new(field, null);
+
+            FieldCodeInspection Invalid(string detail, string? field = null, string? fieldCode = null) =>
+                new(null, new("template.invalid_field_syntax", detail, field, fieldCode, location));
         }
 
-        private static List<string> Tokenize(string code, string location)
+        private static (List<string>? Tokens, StructuralDiagnostic? Diagnostic) Tokenize(string code, string location)
         {
             // Word stores braces as UI, not in instrText. Accept them for standalone parser callers too.
             var input = code.Trim();
@@ -78,7 +90,8 @@ namespace MonoReport.Services
 
                     if (i == input.Length)
                     {
-                        throw new TemplateException("Unterminated quoted field argument.", fieldCode: code, location: location, code: "template.invalid_field_syntax");
+                        return (null, new("template.invalid_field_syntax", "Unterminated quoted field argument.",
+                            FieldCode: code, Location: location));
                     }
 
                     i++;
@@ -94,7 +107,7 @@ namespace MonoReport.Services
                 result.Add(token.ToString());
             }
 
-            return result;
+            return (result, null);
         }
     }
 }

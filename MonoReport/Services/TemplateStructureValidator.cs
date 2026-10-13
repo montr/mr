@@ -10,19 +10,19 @@ public sealed class TemplateStructureValidator(OoxmlFieldParser fieldParser, Reg
 
     public IReadOnlyList<TemplateValidationIssue> Validate(XElement root, string part)
     {
-        return ValidateErrors(root, part).Select(error => Issue(error, part)).ToArray();
+        return Inspect(root, part).Select(diagnostic => Issue(diagnostic, part)).ToArray();
     }
 
-    internal IReadOnlyList<TemplateException> ValidateErrors(XElement root, string part)
+    internal IReadOnlyList<StructuralDiagnostic> Inspect(XElement root, string part)
     {
         var inspection = _fieldParser.Inspect(root, part);
-        var errors = inspection.Errors.ToList();
+        var errors = inspection.Diagnostics.ToList();
         if (inspection.StructureIsSafe)
             errors.AddRange(_regionParser.Inspect(inspection.Fields));
-        return errors.DistinctBy(error => (error.Code, error.Field, error.FieldCode, error.Location)).ToArray();
+        return errors;
     }
 
-    public TemplateValidationIssue Issue(TemplateException error, string? part = null) =>
+    internal TemplateValidationIssue Issue(StructuralDiagnostic error, string? part = null) =>
         new(error.Code, SafeMessage(error.Code), error.Field, part, error.Location);
 
     private static string SafeMessage(string code) => code switch

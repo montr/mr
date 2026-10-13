@@ -15,18 +15,32 @@ public sealed class TemplateValidator(DocxStoryReader storyReader, TemplateStruc
         using var buffer = new MemoryStream();
         template.CopyTo(buffer);
         buffer.Position = 0;
-        var errors = new List<TemplateValidationIssue>();
-        try
+        var document = _storyReader.OpenForValidation(buffer, false, out var packageDiagnostic);
+        if (packageDiagnostic is not null)
+            return new([_structureValidator.Issue(packageDiagnostic)]);
+        using (document)
         {
-            using var document = _storyReader.Open(buffer, false);
-            var stories = _storyReader.Read(document, errors);
-            foreach (var story in stories)
+            var inspection = _storyReader.Inspect(document!);
+            var errors = inspection.Diagnostics.Select(diagnostic =>
+                _structureValidator.Issue(diagnostic, diagnostic.Location)).ToList();
+            foreach (var story in inspection.Stories)
                 errors.AddRange(_structureValidator.Validate(story.Xml.Root!, story.Part.Uri.ToString()));
+            errors = errors.Select((error, index) => (error, index))
+                .OrderBy(item => PartOrder(item.error.Part))
+                .ThenBy(item => item.index)
+                .Select(item => item.error)
+                .ToList();
+            return new TemplateValidationResult(errors);
         }
-        catch (TemplateException error)
-        {
-            errors.Add(_structureValidator.Issue(error));
-        }
-        return new TemplateValidationResult(errors);
     }
+
+    private static (int Kind, string Part) PartOrder(string? part) => part switch
+    {
+        "/word/document.xml" => (0, part),
+        not null when part.StartsWith("/word/header", StringComparison.Ordinal) => (1, part),
+        not null when part.StartsWith("/word/footer", StringComparison.Ordinal) => (2, part),
+        "/word/footnotes.xml" => (3, part),
+        "/word/endnotes.xml" => (4, part),
+        _ => (5, part ?? string.Empty)
+    };
 }

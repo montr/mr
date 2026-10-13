@@ -120,6 +120,43 @@ public sealed class TemplateValidatorTests
     }
 
     [Fact]
+    public void Reports_all_sibling_nested_fields_in_one_cached_result_in_document_order()
+    {
+        var outer = Docx.ComplexContent("MERGEFIELD Outer",
+            Docx.Field("PAGE", "1"),
+            Docx.Field("MERGEFIELD Inner", "inner"),
+            Docx.Field("IF 1 = 1 yes no", "yes"));
+        var bytes = Docx.Create(Docx.P(outer));
+
+        var result = Validate(bytes);
+        Assert.Equal(3, result.Errors.Count);
+        Assert.All(result.Errors, issue =>
+        {
+            Assert.Equal("template.unsupported_nested_field", issue.Code);
+            Assert.Equal("Outer", issue.Field);
+            Assert.Equal("/word/document.xml", issue.Part);
+        });
+        var locations = result.Errors.Select(issue => issue.Location).ToArray();
+        Assert.Equal(new string?[]
+        {
+            "/word/document.xml, paragraph 1, field occurrence 7",
+            "/word/document.xml, paragraph 1, field occurrence 10",
+            "/word/document.xml, paragraph 1, field occurrence 13"
+        }, locations);
+        Assert.Equal(result.Errors.Count, result.Errors.DistinctBy(issue =>
+            (issue.Code, issue.Field, issue.Part, issue.Location)).Count());
+
+        using var input = new MemoryStream(bytes);
+        using var data = System.Text.Json.JsonDocument.Parse("{}");
+        using var provider = new ServiceCollection().AddMonoReport().BuildServiceProvider();
+        var error = Assert.Throws<TemplateException>(() => provider.GetRequiredService<MergeEngine>().Merge(input, data));
+        Assert.Equal(result.Errors[0].Code, error.Code);
+        Assert.Equal(result.Errors[0].Field, error.Field);
+        Assert.Equal(result.Errors[0].Location, error.Location);
+        Assert.Contains("nested PAGE", error.Message);
+    }
+
+    [Fact]
     public void Corrupt_field_state_stops_dependent_story_checks_but_other_stories_continue()
     {
         var invalid = Docx.P(new XElement(WordXml.RunElementName, Docx.Character("end")),
