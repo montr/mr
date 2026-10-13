@@ -6,9 +6,16 @@
 2. Require explicit Product Owner approval of the complete Feature Spec before planning, of the independently reviewed Implementation Plan before implementation, and of the result before completion. On the first `CHANGES REQUESTED`, stop and await Product Owner decisions; do not automatically fix or re-review findings.
 3. Keep feature artifacts under `.docs/features/<NNN>-<slug>/` with sequential, never-reused IDs. `feature-status.json` contains only `phase`; the Orchestrator owns transitions. Record approvals and verification evidence in the feature documents and reconcile persisted state with Git and files when resuming.
 4. Material changes to requirements, architecture, scope, workflow, or approval gates require explicit Product Owner approval. Shortened workflows for minor work also require approval and must retain relevant tests.
-5. Do not push, merge, publish, delete branches, or change controlling Skills without explicit Product Owner permission. Preserve uncommitted changes.
+5. Do not change controlling Skills without explicit Product Owner permission. Follow the Git Operations rules below.
 6. Maintain `.docs/features/backlog.md`: propose deferred requirements for Product Owner approval; do not silently discard them or create a Feature directory until selected.
 7. Historical Feature 001: preserve the original specification as `.docs/features/001-initial-implementation/feature-spec.md`, version `0.0.1`, initially in `review`. Do not invent past approvals or a retrospective plan. Audit or correct it only with explicit authorization.
+
+## Git Operations
+
+1. The Product Owner exclusively manages Git commits and repository publishing operations.
+2. Agents must not stage files, create commits, amend or rewrite commits, push, merge, rebase, delete branches, create tags, or publish releases without separate, explicit Product Owner authorization for the specific action.
+3. Feature approval, implementation approval, and acceptance do not imply authorization for any Git operation listed above.
+4. Agents may inspect Git status, history, and diffs. Preserve existing staged and unstaged user changes.
 
 ## Coding Guidelines
 

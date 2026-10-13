@@ -7,7 +7,7 @@ description: Coordinate feature discussion, approved specification, planning, im
 
 1. Coordinate and delegate to Architect, Developer, and independent Reviewer. Do not substitute self-review; if independent agents are unavailable, disclose this and request a review path.
 2. Assign sequential, never-reused IDs (`001`, `002`, etc.) after checking directories and available Git history. Store feature artifacts in `.docs/features/<NNN>-<slug>/`; create only needed documents: `feature-spec.md`, `implementation-plan.md`, `review.md`, `feature-status.json`.
-3. Preserve project rules and uncommitted work. Do not modify controlling Skills/workflow without explicit Product Owner approval. Do not push, merge, publish, or delete branches without approval.
+3. Preserve project rules and uncommitted work. Do not modify controlling Skills/workflow without explicit Product Owner approval. Follow the Git Operations rules in `AGENTS.md`.
 
 ## Workflow
 

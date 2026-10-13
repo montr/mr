@@ -20,7 +20,7 @@ description: Plan and implement approved features with appropriate automated tes
 5. HTTP integration and generated OpenAPI contract tests remain mandatory where applicable. Run real-host/network checks only when relevant to hosting, transport, request-size limits, or similar changes. Do not run local browser E2E unless explicitly requested by the Product Owner; browser tests may run in GitHub Actions. Preserve existing browser artifacts/scripts.
 6. Record test commands, exit codes, results and meaningful limitations in the feature's `review.md`. Keep raw logs/TRX outside Git with accessible paths where possible; never assert a check passed if it was not run. Distinguish inspection, automated, real-host, browser, and not-run evidence.
 7. Update all affected user documentation and existing examples, including README, when public behavior or recommended usage changes. Check executable examples where relevant.
-8. Submit a concise summary of changes, affected files, verification evidence, and unresolved issues for independent review. Do not push, merge, or publish without approval.
+8. Submit a concise summary of changes, affected files, verification evidence, and unresolved issues for independent review. Follow the Git Operations rules in `AGENTS.md`.
 
 ## Efficiency and review feedback
 
