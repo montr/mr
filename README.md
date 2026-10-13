@@ -5,9 +5,10 @@ MonoReport generates DOCX documents from Microsoft Word templates and JSON data.
 1. `MonoReport` is the library.
 2. `MonoReport.Cli` is the command-line application and `monoreport` .NET tool package.
 3. `MonoReport.Api` is the separate ASP.NET Core HTTP application. It references Core; Core and CLI have no HTTP dependencies.
-4. `MonoReport.Tests` contains Core and Open XML tests.
-5. `MonoReport.Cli.Tests` contains CLI service and real-process tests.
-6. `MonoReport.Api.Tests` contains HTTP integration, generated OpenAPI contract, and real Kestrel host tests.
+4. `MonoReport.UI` is the React and TypeScript browser playground for template selection, JSON editing, document generation, preview, and download through `MonoReport.Api`.
+5. `MonoReport.Tests` contains Core and Open XML tests.
+6. `MonoReport.Cli.Tests` contains CLI service and real-process tests.
+7. `MonoReport.Api.Tests` contains HTTP integration, generated OpenAPI contract, and real Kestrel host tests.
 
 Build and test from the repository root. These single-line commands work in macOS/Linux Bash or zsh, Windows PowerShell, and Windows CMD:
 
@@ -31,6 +32,28 @@ dotnet test MonoReport.Api.Tests/MonoReport.Api.Tests.csproj -c Release `
 ```
 
 Browser/Playwright verification is a separate manual workflow and is not part of the normal local test run.
+
+## Browser UI
+
+The UI requires Node.js and npm in addition to the .NET SDK. Start `MonoReport.Api` at `http://127.0.0.1:5080` using the command in the HTTP API section. In another terminal, install the locked frontend dependencies and start the development server:
+
+```bash
+cd MonoReport.UI
+npm ci
+npm run dev
+```
+
+Open `http://localhost:3000`. The development server proxies relative `/api` requests to the local API. Set `MONOREPORT_API_URL` before `npm run dev` only when the API uses another local origin. The browser sends the selected template and JSON only when Generate is pressed; the UI has no persistence, analytics, or alternate generation backend.
+
+Run the focused frontend checks from `MonoReport.UI`:
+
+```bash
+npm run test -- --run
+npm run typecheck
+npm run build
+```
+
+The production command creates static assets under `MonoReport.UI/dist`. Feature 004 does not commit generated assets, package them into `MonoReport.Api`, add API static hosting or `UiEnabled`, or provide Docker packaging. Deploying the static bundle with the API is a separate integration step.
 
 ![Word template, JSON data, and generated construction estimate](.docs/Template%20to%20JSON%20to%20Document%20Workflow.png)
 
