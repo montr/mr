@@ -23,6 +23,10 @@ function GitHubIcon() {
   return <svg viewBox="0 0 24 24" width="13" height="13" style={{ marginRight: 5, verticalAlign: "middle" }} aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 .8A11.2 11.2 0 0 0 8.46 22.62c.56.1.77-.24.77-.54v-2.13c-3.13.68-3.79-1.33-3.79-1.33-.5-1.27-1.24-1.61-1.24-1.61-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 .1.78 1.4 3.27.95.1-.72.39-1.21.71-1.49-2.5-.29-5.13-1.25-5.13-5.54 0-1.23.44-2.23 1.16-3.02-.12-.28-.5-1.43.11-2.97 0 0 .94-.3 3.08 1.15a10.7 10.7 0 0 1 5.6 0c2.14-1.45 3.08-1.15 3.08-1.15.61 1.54.23 2.69.11 2.97.72.79 1.15 1.79 1.15 3.02 0 4.3-2.63 5.25-5.14 5.54.4.35.75 1.03.75 2.08v3.09c0 .3.21.65.78.54A11.2 11.2 0 0 0 12 .8Z" /></svg>;
 }
 
+function DocumentationIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.3c-3.8-2-7-1.7-9-1.1v13.5c3-.9 6.2-.7 9 1 2.8-1.7 6-1.9 9-1V5.2c-2-.6-5.2-.9-9 1.1Zm0 0v13.4" /></svg>;
+}
+
 function DocumentEmpty({ children }: { children: string }) {
   return <div className="empty"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h8" /></svg><strong>{children}</strong></div>;
 }
@@ -203,7 +207,7 @@ export default function App() {
             <Button className="download" disabled={!result} onClick={download} icon={<DownloadIcon />}>Download</Button>
           </div>
           <div
-            className={`canvas ${active === "errors" ? "errors-view" : ""} ${dragging ? "drop-target" : ""}`}
+            className={`canvas ${active === "errors" && errors.length > 0 ? "errors-view" : ""} ${dragging ? "drop-target" : ""}`}
             onDragEnter={event => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
             onDragOver={event => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}
             onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragging(false); }}
@@ -213,7 +217,7 @@ export default function App() {
       </main>
       <footer>
         <span className="project-links"><a href={repositoryUrl} target="_blank" rel="noreferrer" title="MonoReport on GitHub"><GitHubIcon />MonoReport</a><a href={`${repositoryUrl}/releases/tag/v${__APP_VERSION__}`} target="_blank" rel="noreferrer">v{__APP_VERSION__}</a></span>
-        <a href="/docs/">API docs</a>
+        <a href="/docs/" title="API documentation"><DocumentationIcon />API docs</a>
       </footer>
     </div>
   </ConfigProvider>;
