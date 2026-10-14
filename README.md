@@ -33,6 +33,12 @@ dotnet test MonoReport.Api.Tests/MonoReport.Api.Tests.csproj -c Release `
 
 Browser/Playwright verification is a separate manual workflow and is not part of the normal local test run.
 
+
+![Word template, JSON data, and generated construction estimate](.docs/Template%20to%20JSON%20to%20Document%20Workflow.png)
+
+This illustration shows the workflow conceptually. For working templates, use the actual Word MERGEFIELD syntax and item-relative paths described in [Collections](#collections); the pictured field notation and JSON are illustrative.
+
+
 ## Browser UI
 
 The UI requires Node.js and npm in addition to the .NET SDK. Start `MonoReport.Api` at `http://127.0.0.1:5080` using the command in the HTTP API section. In another terminal, install the locked frontend dependencies and start the development server:
@@ -55,9 +61,13 @@ npm run build
 
 The production command creates static assets under `MonoReport.UI/dist`. Feature 004 does not commit generated assets, package them into `MonoReport.Api`, add API static hosting or `UiEnabled`, or provide Docker packaging. Deploying the static bundle with the API is a separate integration step.
 
-![Word template, JSON data, and generated construction estimate](.docs/Template%20to%20JSON%20to%20Document%20Workflow.png)
+### DOCX preview limitations
 
-This illustration shows the workflow conceptually. For working templates, use the actual Word MERGEFIELD syntax and item-relative paths described in [Collections](#collections); the pictured field notation and JSON are illustrative.
+MonoReport uses `docx-preview` for browser rendering and includes a client-side compatibility workaround for OOXML simple fields (`w:fldSimple`).
+
+The workaround preserves cached field content in the preview without changing the original template or generated DOCX. Other rendering differences from Microsoft Word may still occur.
+
+See [DOCX field compatibility investigation](.docs/features/004-monoreport-ui/docx-preview-field-compatibility.md) for the root cause, comparison of Word-generated and programmatically generated templates, regression findings, and workaround details.
 
 ## Core API
 

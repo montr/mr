@@ -90,6 +90,7 @@ describe("MonoReport playground", () => {
   it("sends generation only on click, prevents duplicates, previews real response bytes, and downloads them", async () => {
     const user = userEvent.setup();
     let resolve!: (response: Response) => void;
+    const responseBlob = new Blob([new Uint8Array([80, 75, 7, 8])], { type: mime });
     const fetchMock = vi.fn(() => new Promise<Response>(done => { resolve = done; }));
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
@@ -100,13 +101,14 @@ describe("MonoReport playground", () => {
     expect(generate).toBeDisabled();
     await user.click(generate);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    resolve(success());
+    resolve({ ok: true, status: 200, blob: async () => responseBlob, headers: new Headers({ "Content-Type": mime, "Content-Disposition": "attachment; filename=generated.docx" }) } as Response);
     await screen.findByText("Result preview");
+    expect(previewSources.at(-1)).toBe(responseBlob);
     const download = screen.getByRole("button", { name: /Download/ });
     expect(download).toBeEnabled();
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     await user.click(download);
-    expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(URL.createObjectURL).toHaveBeenCalledWith(responseBlob);
     expect(click).toHaveBeenCalled();
   });
 
