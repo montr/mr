@@ -1,4 +1,4 @@
-# MonoReport
+# monoreport
 
 MonoReport generates DOCX documents from Microsoft Word templates and JSON data. It preserves Word fields and formatting, repeats collection regions, and supports custom value formatters. It requires .NET SDK 10; Microsoft Word is needed to edit or inspect templates, not to run the engine.
 

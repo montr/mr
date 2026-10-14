@@ -9,7 +9,7 @@ import "./styles.css";
 import "./mobile.css";
 
 type Tab = "template" | "result" | "errors";
-const repositoryUrl = "https://github.com/montr/mr";
+const repositoryUrl = "https://github.com/montr/monoreport";
 
 function diagnostic(title: string, detail: string): Diagnostic[] {
   return [{ title, detail }];

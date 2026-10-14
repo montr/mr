@@ -36,7 +36,7 @@ describe("MonoReport playground", () => {
     expect(screen.getByLabelText("JSON data")).toHaveValue("{}");
     expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
     const repositoryLink = screen.getByRole("link", { name: "MonoReport" });
-    expect(repositoryLink).toHaveAttribute("href", "https://github.com/montr/mr");
+    expect(repositoryLink).toHaveAttribute("href", "https://github.com/montr/monoreport");
     expect(repositoryLink.querySelector("svg")).not.toBeNull();
     const splitter = screen.getByRole("separator");
     fireEvent.keyDown(splitter, { key: "ArrowRight" });
