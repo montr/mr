@@ -17,6 +17,18 @@ The product architecture principles below record approved product direction. Pla
 
 ## Planned Capabilities
 
+### Playground Examples
+
+Status: Backlog. Proposed as a small Feature after Feature 004; implementation is not approved.
+
+1. Provide a static JSON manifest describing demo examples by ID, title, document format, template path, and sample data path, with an explicit default example.
+2. On opening MonoReport Playground, automatically load the default example template and JSON, and show its template preview. Generate a result only when the user clicks Generate.
+3. Provide a compact example selector, supporting multiple examples without introducing a separate demo mode.
+4. Bundle example assets with the UI as local static resources; do not require GitHub access or a new server endpoint at runtime. Keep the canonical sample files in one location where practical.
+5. Preserve user edits during asynchronous loading; require confirmation before switching examples when the current template or JSON has unsaved changes. Clearing a template must not automatically reload the default example.
+6. Include a document-format identifier in the manifest to support DOCX now and XLSX examples later, without implementing XLSX generation or preview in this Feature.
+7. Keep the catalog independent of the document-generation engine; avoid speculative multi-format abstractions, search, tags, categories, or other catalog infrastructure.
+
 ### Excel Template Engine
 
 Status: Planned, not implemented. Detailed scope requires a future approved Feature Spec.
