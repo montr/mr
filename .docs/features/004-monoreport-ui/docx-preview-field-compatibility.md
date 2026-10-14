@@ -11,7 +11,7 @@
 ## 2. Reproduction materials
 
 1. `Samples/sample.template.docx` — sample template created programmatically (the original uploaded comparison file).
-2. `sample.template copy.docx` — user copy of that template, edited and saved in Microsoft Word; two extra fields were inserted at the top: one invalid field showing `Error! No bookmark name given.` in Word and one `MERGEFIELD Test`.
+2. **Word-resaved comparison (not stored in Git):** to reproduce, open `Samples/sample.template.docx` in Microsoft Word, add two fields near the beginning of the document (one intentionally invalid field, and one valid `MERGEFIELD Test`), then use **Save As** to create a separate DOCX. In the original experiment, Word displayed `Error! No bookmark name given.` for the invalid field. The exact OOXML emitted by Word may vary with its version and editing steps; the counts below describe the actual 2026-10-14 comparison, not guaranteed output of every reproduction.
 3. `Samples/sample.json` — sample input with three `Materials` rows.
 4. PO browser comparison on 2026-10-14: Template and Result, each with normalization enabled and disabled, for both templates. Screenshots were examined in conversation but are intentionally **not committed to the repository**.
 
@@ -19,7 +19,7 @@
 
 Counts from `word/document.xml` using namespace-aware XML inspection:
 
-| Element | Programmatic template | Word-resaved copy |
+| Element | Programmatic template | Word-resaved copy (original experiment) |
 | --- | ---: | ---: |
 | `w:fldSimple` | 21 | 1 |
 | `w:fldChar` | 0 | 66 |
@@ -73,7 +73,7 @@ The successful generation from the Word-resaved copy, including repeated rows an
 2. **No field-format rejection or special validation** in Core or UI: `w:fldSimple` is valid OOXML.
 3. **Document the renderer limitation, not a document-invalidity claim.** The downloadable DOCX is authoritative; browser preview fidelity can differ from Microsoft Word for other constructs too.
 4. Extra browser ZIP/XML work consumes CPU and memory; no server-side normalization, worker, size limit, or renderer fork was approved. Reevaluate if users encounter actual performance issues.
-5. Report the underlying problem upstream in `docx-preview` separately. When a release fixes it, verify both sample templates and generated results **with normalization disabled** before removing the workaround and its direct JSZip dependency if otherwise unused.
+5. Report the underlying problem upstream in `docx-preview` separately. When a release fixes it, verify the repository sample, a Word-resaved comparison recreated using section 2, and their generated results **with normalization disabled** before removing the workaround and its direct JSZip dependency if otherwise unused.
 
 ## 7. Traceability
 
