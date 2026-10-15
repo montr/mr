@@ -1,6 +1,6 @@
 # Feature 005 — Implementation Review and Verification
 
-**Status:** Ready for Product Owner acceptance
+**Status:** Accepted and completed
 **Date:** 2026-10-15
 
 ## 1. Review path and result
@@ -8,7 +8,7 @@
 1. The Product Owner approved the single-Codex experimental workflow and explicitly waived independent Architect and Reviewer agent cycles for this Feature.
 2. Codex reconciled the implementation against every acceptance criterion and inspected the highest-risk behavior: SPA fallback must never replace backend-prefix errors, disabled documentation routes, or missing file responses.
 3. Automated host tests and real-host/container smoke checks cover those boundaries with status, content-type, and response-body assertions. No unresolved local implementation blocker remains.
-4. The implementation is ready for Product Owner acceptance. This document does not record Product Owner acceptance or Feature completion.
+4. On 2026-10-15, the Product Owner accepted the implementation after local, manual, GitHub-hosted, and public-image verification. Feature 005 is complete.
 
 ## 2. Implemented behavior
 
@@ -33,13 +33,13 @@
 9. The existing development topology was started with the API on port 5080 and Webpack Dev Server on port 3000. UI serving plus `/api`, `/docs`, and `/openapi` proxy behavior passed curl checks without browser automation.
 10. `node .github/scripts/release-version.mjs` accepted `v0.1.0` and `v0.1.0-rc.1`, classified stable and prerelease correctly, and rejected invalid `v01.2.3`. `docker compose config` and `git diff --check` passed.
 
-## 4. Pending external and Product Owner verification
+## 4. External verification and accepted residual risks
 
-1. GitHub-hosted PR/main Actions have not run because Codex did not commit or push. Their actual success and failure propagation remain pending after Product Owner Git operations.
-2. No release tag, GHCR image, or multi-platform manifest was published. Remote `linux/amd64` and `linux/arm64` availability, stable/prerelease tag behavior, and manifest inspection remain pending the first Product Owner-controlled release.
-3. GHCR public visibility and unauthenticated pull remain pending first publication and the Product Owner's manual package visibility check.
-4. The Product Owner manually verified that the production UI runs correctly in Docker, including Monaco Editor and the Format action, and also verified the development mode. No browser automation was run by Codex.
-5. The completed npm audit reported 9 vulnerabilities. The 5 high-severity findings are in development dependencies. The production dependency tree retains 2 low-severity DOMPurify findings through Monaco Editor; these were previously reviewed and accepted in Feature 004. No dependency versions were changed for Feature 005.
+1. The Product Owner reported successful GitHub Actions validation after publishing the repository changes.
+2. The Product Owner verified successful publication and public availability of `ghcr.io/montr/monoreport:0.1.0` with both `linux/amd64` and `linux/arm64` manifest variants.
+3. The Product Owner manually verified that the production UI runs correctly in Docker, including Monaco Editor and the Format action, and also verified the development mode. No browser automation was run by Codex.
+4. The completed npm audit reported 9 vulnerabilities. The 5 high-severity findings are confined to development dependencies. The production dependency tree retains 2 low-severity DOMPurify findings through Monaco Editor; these residual risks were previously reviewed and accepted in Feature 004. No dependency versions were changed for Feature 005.
+5. Local Docker builds require sufficient Docker Desktop memory for the webpack stage. Two attempts at a 2 GiB limit failed with resource exhaustion; the build succeeded at 8 GiB. This local resource requirement does not change the produced runtime image.
 
 ## 5. Workflow telemetry
 
@@ -49,5 +49,5 @@
 
 ## 6. Product Owner decision
 
-1. Product Owner acceptance is not yet recorded.
-2. On acceptance, the Orchestrator may change `feature-status.json` from `acceptance` to `completed`. Acceptance does not authorize staging, commits, pushes, tags, releases, or GitHub settings changes.
+1. On 2026-10-15, the Product Owner explicitly accepted Feature 005 and directed the Orchestrator to close it according to the project workflow.
+2. Feature 005 is completed. This acceptance and closure did not authorize or cause Codex to stage files, create commits, push, or create tags.
