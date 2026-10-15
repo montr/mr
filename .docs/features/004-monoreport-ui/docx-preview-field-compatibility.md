@@ -59,6 +59,18 @@ The screenshots establish these **visual outcomes**, not the exact library-code 
 
 The successful generation from the Word-resaved copy, including repeated rows and scalar values visible with the workaround, gives practical evidence that Core processes the complex fields in this sample. It does not prove every OOXML field shape is supported by Core.
 
+### Follow-up: complex table fields that also disappeared (2026-10-15)
+
+A targeted OOXML inspection of the Word-resaved comparison established the following details in `word/document.xml`:
+
+1. The sole remaining `w:fldSimple` is `MERGEFIELD Unit`, located in a material-row table cell and containing cached text `«Unit»`.
+2. The `MERGEFIELD Reference`, `MERGEFIELD Description`, and `MERGEFIELD Currency` fields in neighboring material-row cells use the **complex** representation (`w:fldChar` begin/separate/end plus `w:instrText`). Their cached text is present as runs; Word split some visible labels across text runs and inserted `w:proofErr` spelling markers.
+3. Without normalization, the PO observed missing labels/values in some of those complex-field cells as well as the simple `Unit` cell. With normalization, the same template and generated result rendered the table values.
+
+**Important distinction:** The confirmed parser omission explains why the `Unit` simple field disappears, but it does not directly explain why adjacent complex fields are missing. A possible indirect interaction between an unsupported simple-field node and table/paragraph processing or rendering is **unproven**. The screenshots demonstrate the symptom; they do not isolate the mechanism.
+
+A useful follow-up upstream regression experiment would compare the **same Word-resaved DOCX** (a) unchanged, (b) with only the `Unit` simple field unwrapped, and (c) with only that field removed, checking the rendered HTML/DOM for `Reference`, `Description`, `Currency`, and `Unit`. This would help distinguish a parser interaction from a layout/rendering effect. The Word-resaved comparison DOCX is not committed; recreate it using section 2.
+
 ## 5. Technical cause and selected mitigation
 
 1. The Feature 004 Architect and independent Reviewer inspected installed `docx-preview` 0.4.1: its paragraph parsing path does not preserve paragraph-level `w:fldSimple` and their cached child runs. Consequently its HTML output silently drops the contained visible text. This cause is confirmed for the original programmatic sample.
@@ -80,6 +92,6 @@ The successful generation from the Word-resaved copy, including repeated rows an
 1. `.docs/features/004-monoreport-ui/implementation-plan.md` — Architect investigation (section 13), follow-up plan (section 14), independent review (section 15), scoped PO authorization (section 16).
 2. `.docs/features/004-monoreport-ui/review.md` — scoped implementation evidence and independent PASS (sections 22–23).
 3. `MonoReport.UI/src/services/docxPreviewNormalization.ts` — removable compatibility implementation; corresponding `.test.ts` contains focused fixtures.
-4. Upstream project: https://github.com/VolodymyrBaydalka/docxjs ; npm package: https://www.npmjs.com/package/docx-preview .
+4. Upstream issue: https://github.com/VolodymyrBaydalka/docxjs/issues/237 ; npm package: https://www.npmjs.com/package/docx-preview .
 
 This note separates file-level inspection and observed browser behavior from inferences about library internals; do not use it as proof that every complex-field edge case is supported.

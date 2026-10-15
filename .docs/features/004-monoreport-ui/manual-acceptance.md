@@ -1,7 +1,7 @@
 # Feature 004 — Product Owner Manual Acceptance
 
-Date: 2026-10-14
-Status: **Functional manual checks PASS (6/6); feature acceptance pending**
+Date: 2026-10-14; final acceptance recorded 2026-10-15
+Status: **ACCEPTED — Feature 004 completed**
 
 ## Environment
 
@@ -35,3 +35,14 @@ Status: **Functional manual checks PASS (6/6); feature acceptance pending**
 3. Further UI observations and prioritization will be provided separately by the Product Owner. Address preview and visual findings through the established review/approval workflow.
 4. No additional headless Chrome/CDP sessions are authorized. Browser-based visual and interactive acceptance should normally be performed manually by the Product Owner; automated browser sessions require explicit, separately justified authorization. Discuss codifying this rule in the Feature 004 retrospective.
 5. Git staging and commits remain solely under Product Owner control.
+
+## Final Product Owner Acceptance — 2026-10-15
+
+1. The Product Owner explicitly accepts Feature 004, including the complete implementation, verified functional behavior, and all subsequently approved corrections. This final decision supersedes the pending acceptance state above without altering the historical observations, review findings, or evidence that led to it.
+2. The accepted baseline includes browser-side `w:fldSimple` normalization for both Template and Result preview copies. The original selected template remains authoritative for API upload, and the original API response remains authoritative for Download.
+3. The accepted presentation baseline includes centered Errors empty state, a visible mobile Download icon and label, the approved footer icons, and the final Monaco layout and typography with a 12-pixel font and enabled minimap.
+4. The accepted local-development baseline includes Webpack proxy routes for `/api`, `/docs`, and `/openapi`.
+5. The Product Owner confirms manual verification of the final functionality and presentation, including the corrected Template and Result previews and final Monaco presentation. The earlier six-item functional checklist remains PASS.
+6. Previously documented residual risks are accepted, including the approximately 13.2 MiB bundle, bounded DOCX preview-normalization and renderer-fidelity risks, and Monaco 0.57.0's two low-severity advisories involving vendored DOMPurify 3.4.15. The sanitizer risk should be revisited when a compatible upstream Monaco fix becomes available.
+7. The independent reviews, prior `CHANGES REQUESTED` verdicts, investigation results, limitations, and correction evidence remain preserved as audit history. The later scoped DOCX preview implementation received independent PASS; subsequent localized presentation and proxy corrections are accepted by the Product Owner as part of the final baseline.
+8. The approved Feature Spec, retained implementation evidence, Product Owner manual results, and accepted follow-up changes are consistent with the completed status. Feature 004 is therefore closed with `feature-status.json` set to `completed`.

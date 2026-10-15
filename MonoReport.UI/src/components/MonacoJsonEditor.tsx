@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import * as monaco from "monaco-editor";
+import { useEffect, useRef } from "react";
 
 interface Props {
   value: string;
@@ -18,11 +18,10 @@ export function MonacoJsonEditor({ value, onChange }: Props) {
       language: "json",
       theme: "vs",
       automaticLayout: true,
-      minimap: { enabled: false },
+      minimap: { enabled: true },
       scrollBeyondLastLine: false,
-      fontSize: 13,
-      lineHeight: 23,
-      padding: { top: 12, bottom: 12 },
+      fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace",
+      fontSize: 12,
       ariaLabel: "JSON data"
     });
     const subscription = editor.onDidChangeModelContent(() => change.current(editor.getValue()));
