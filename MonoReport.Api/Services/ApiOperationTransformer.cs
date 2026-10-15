@@ -30,10 +30,10 @@ public sealed class ApiOperationTransformer : IOpenApiOperationTransformer
                 } }
             }
         };
-        operation.Summary = generation ? "Generate a DOCX document" : "Validate DOCX template structure";
+        operation.Summary = generation ? "Generate a DOCX document" : "Analyze a DOCX template";
         operation.Description = generation
             ? "Returns raw DOCX bytes. Structural validity does not guarantee data compatibility."
-            : "Independent structural validation without JSON, formatting, or generation. Invalid nonempty DOCX content returns 200 with valid=false. Errors are collected across readable parts and safe stages; exhaustive diagnostics are not guaranteed.";
+            : "Returns structural diagnostics and the recursive template field model without JSON input or generation. Structurally invalid nonempty DOCX content returns 200 with valid=false and all reliably extracted fields.";
         if (generation)
         {
             var success = (OpenApiResponse)operation.Responses!["200"];

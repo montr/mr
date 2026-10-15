@@ -11,7 +11,7 @@ namespace MonoReport.Tests.Services
         {
             using var provider = new ServiceCollection().AddMonoReport().BuildServiceProvider();
             return new CliApplication(new CliOptionsParser(), provider.GetRequiredService<MergeEngine>(),
-                provider.GetRequiredService<TemplateValidator>());
+                provider.GetRequiredService<TemplateAnalyzer>());
         }
         private const string TemplateFileName = "sample.template.docx";
         private const string DataFileName = "sample.json";

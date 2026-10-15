@@ -3,9 +3,18 @@ using MonoReport.Models;
 
 namespace MonoReport.Services
 {
-    public sealed class OoxmlFieldParser(FieldCodeParser fieldCodeParser)
+    public sealed class OoxmlFieldParser
     {
-        private readonly FieldCodeParser _fieldCodeParser = fieldCodeParser ?? throw new ArgumentNullException(nameof(fieldCodeParser));
+        private readonly FieldCodeParser _fieldCodeParser;
+        private readonly Action<XElement>? _inspectionObserver;
+
+        public OoxmlFieldParser(FieldCodeParser fieldCodeParser) : this(fieldCodeParser, null) { }
+
+        internal OoxmlFieldParser(FieldCodeParser fieldCodeParser, Action<XElement>? inspectionObserver)
+        {
+            _fieldCodeParser = fieldCodeParser ?? throw new ArgumentNullException(nameof(fieldCodeParser));
+            _inspectionObserver = inspectionObserver;
+        }
 
         public void Validate(XElement root, string location)
         {
@@ -16,6 +25,7 @@ namespace MonoReport.Services
 
         internal FieldInspection Inspect(XElement root, string location)
         {
+            _inspectionObserver?.Invoke(root);
             var found = new List<FieldReference>();
             var diagnostics = new List<StructuralDiagnostic>();
             var structures = new List<(XElement Anchor, string Code)>();

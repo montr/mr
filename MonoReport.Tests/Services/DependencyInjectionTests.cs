@@ -10,7 +10,7 @@ namespace MonoReport.Tests.Services;
 
 public sealed class DependencyInjectionTests
 {
-    private static readonly Type[] Transients = [typeof(MergeEngine), typeof(TemplateValidator), typeof(DocxStoryReader), typeof(TemplateStructureValidator), typeof(DocumentRenderer), typeof(DataResolver), typeof(OoxmlFieldParser), typeof(FieldCodeParser), typeof(RegionParser), typeof(ValueFormatter), typeof(CachedResultWriter)];
+    private static readonly Type[] Transients = [typeof(MergeEngine), typeof(TemplateAnalyzer), typeof(DocxStoryReader), typeof(TemplateStructureValidator), typeof(DocumentRenderer), typeof(DataResolver), typeof(OoxmlFieldParser), typeof(FieldCodeParser), typeof(RegionParser), typeof(ValueFormatter), typeof(CachedResultWriter)];
     private static readonly Type[] Singletons = [typeof(FormatterRegistry), typeof(RubSpellOutFormatter)];
 
     [Fact]

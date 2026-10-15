@@ -131,7 +131,9 @@ namespace MonoReport.Tests.Services
             var fieldParser = new OoxmlFieldParser(new FieldCodeParser());
             var renderer = new DocumentRenderer(new DataResolver(), fieldParser, new RegionParser(),
                 new ValueFormatter(registry), new CachedResultWriter());
-            return new MergeEngine(renderer, new DocxStoryReader(), new TemplateStructureValidator(fieldParser, new RegionParser()));
+            var storyReader = new DocxStoryReader();
+            return new MergeEngine(renderer, storyReader,
+                new TemplateAnalyzer(storyReader, new TemplateStructureValidator(fieldParser, new RegionParser())));
         }
 
         internal static MergeResult Merge(byte[] template, string json, MergeOptions? options = null, FormatterRegistry? formatters = null)

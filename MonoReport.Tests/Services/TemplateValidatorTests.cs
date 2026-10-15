@@ -7,14 +7,14 @@ using System.Xml.Linq;
 
 namespace MonoReport.Tests.Services;
 
-public sealed class TemplateValidatorTests
+public sealed class TemplateAnalyzerTests
 {
     [Fact]
     public void Validates_without_data_and_retains_stream_ownership()
     {
         using var provider = new ServiceCollection().AddMonoReport().BuildServiceProvider();
         using var stream = new MemoryStream(Docx.Create(Docx.P(Docx.Field("MERGEFIELD Absent"))));
-        var result = provider.GetRequiredService<TemplateValidator>().Validate(stream);
+        var result = provider.GetRequiredService<TemplateAnalyzer>().Analyze(stream);
         Assert.True(result.Valid);
         Assert.Empty(result.Errors);
         Assert.Empty(result.Warnings);
@@ -29,7 +29,7 @@ public sealed class TemplateValidatorTests
         using var provider = new ServiceCollection().AddMonoReport().BuildServiceProvider();
         var bytes = Docx.Create(Docx.P(Docx.Field(code)));
         using var input = new MemoryStream(bytes);
-        var issue = Assert.Single(provider.GetRequiredService<TemplateValidator>().Validate(input).Errors);
+        var issue = Assert.Single(provider.GetRequiredService<TemplateAnalyzer>().Analyze(input).Errors);
         Assert.Equal(expected, issue.Code);
         Assert.Equal("/word/document.xml", issue.Part);
         using var generation = new MemoryStream(bytes);
@@ -43,7 +43,7 @@ public sealed class TemplateValidatorTests
     {
         using var provider = new ServiceCollection().AddMonoReport().BuildServiceProvider();
         using var input = new MemoryStream([1, 2, 3]);
-        var result = provider.GetRequiredService<TemplateValidator>().Validate(input);
+        var result = provider.GetRequiredService<TemplateAnalyzer>().Analyze(input);
         Assert.False(result.Valid);
         Assert.Equal("template.invalid_package", Assert.Single(result.Errors).Code);
     }
@@ -182,7 +182,7 @@ public sealed class TemplateValidatorTests
         using var inner = new MemoryStream(prefix.Concat(bytes).ToArray());
         inner.Position = prefix.Length;
         using var stream = new NonSeekableReadStream(inner);
-        var result = Validator().Validate(stream);
+        var result = Analyzer().Analyze(stream);
         Assert.True(result.Valid);
         Assert.True(stream.CanRead);
         Assert.Equal(prefix.Concat(bytes), inner.ToArray());
@@ -192,37 +192,140 @@ public sealed class TemplateValidatorTests
     [Fact]
     public void Rejects_null_and_unreadable_streams_and_propagates_operational_io()
     {
-        var validator = Validator();
-        Assert.Throws<ArgumentNullException>(() => validator.Validate(null!));
+        var analyzer = Analyzer();
+        Assert.Throws<ArgumentNullException>(() => analyzer.Analyze(null!));
         using var unreadable = new UnreadableStream();
-        Assert.Throws<ArgumentException>(() => validator.Validate(unreadable));
+        Assert.Throws<ArgumentException>(() => analyzer.Analyze(unreadable));
         using var failing = new ThrowingReadStream();
-        Assert.Throws<IOException>(() => validator.Validate(failing));
+        Assert.Throws<IOException>(() => analyzer.Analyze(failing));
     }
 
     [Fact]
     public async Task Reusable_validator_is_concurrent_and_never_evaluates_data_or_formatters()
     {
-        var validator = Validator();
+        var analyzer = Analyzer();
         var bytes = Docx.Create(Docx.P(Docx.Field("MERGEFIELD Missing \\* DefinitelyUnavailable")));
         var results = await Task.WhenAll(Enumerable.Range(0, 32).Select(_ => Task.Run(() =>
         {
             using var stream = new MemoryStream(bytes);
-            return validator.Validate(stream);
+            return analyzer.Analyze(stream);
         })));
         Assert.All(results, result => { Assert.True(result.Valid); Assert.Empty(result.Errors); });
     }
 
-    private static TemplateValidationResult Validate(byte[] bytes)
+    [Fact]
+    public void Builds_ordered_fields_from_simple_and_split_complex_codes_with_supported_switches()
     {
-        using var stream = new MemoryStream(bytes);
-        return Validator().Validate(stream);
+        var complex = new[]
+        {
+            new XElement(WordXml.RunElementName, Docx.Character("begin"),
+                new XElement(WordXml.InstructionTextElementName, " MERGE")),
+            new XElement(WordXml.RunElementName,
+                new XElement(WordXml.InstructionTextElementName, "FIELD Amount \\# \"#,##0.00\" \\* Upper "),
+                Docx.Character("separate")),
+            Docx.Run("old"), new XElement(WordXml.RunElementName, Docx.Character("end"))
+        };
+        var result = Validate(Docx.Create(
+            Docx.P(Docx.Field("MERGEFIELD Company.Name")), Docx.P(complex)));
+
+        Assert.True(result.Valid);
+        Assert.Equal(new[] { "Company.Name", "Amount" }, result.Fields.Select(field => field.Name));
+        Assert.Equal("string", result.Fields[1].Type);
+        var format = Assert.Single(result.Fields[1].Formats);
+        Assert.Equal(new[] { ("number", "#,##0.00"), ("general", "Upper") },
+            format.Select(item => (item.Kind, item.Value)));
+        Assert.Empty(Assert.Single(result.Fields[0].Formats));
+        Assert.Null(result.Fields[1].Fields);
     }
 
-    private static TemplateValidator Validator()
+    [Fact]
+    public void Consolidates_duplicate_format_sequences_and_preserves_all_variants_in_first_order()
+    {
+        var result = Validate(Docx.Create(
+            Docx.P(Docx.Field("MERGEFIELD Name \\* Upper")),
+            Docx.P(Docx.Field("MERGEFIELD Name \\* Upper")),
+            Docx.P(Docx.Field("MERGEFIELD Name")),
+            Docx.P(Docx.Field("MERGEFIELD Name \\* Lower")),
+            Docx.P(Docx.Field("MERGEFIELD Name"))));
+
+        Assert.True(result.Valid);
+        var field = Assert.Single(result.Fields);
+        Assert.Equal("Name", field.Name);
+        Assert.Equal(3, field.Formats.Count);
+        Assert.Equal("Upper", Assert.Single(field.Formats[0]).Value);
+        Assert.Empty(field.Formats[1]);
+        Assert.Equal("Lower", Assert.Single(field.Formats[2]).Value);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public void Merges_repeated_and_nested_regions_with_scope_isolation_and_empty_fields()
+    {
+        var result = Validate(Docx.Create(
+            Docx.P(Docx.Field("MERGEFIELD TableStart:Orders")),
+            Docx.P(Docx.Field("MERGEFIELD Number")),
+            Docx.P(Docx.Field("MERGEFIELD TableStart:Items")),
+            Docx.P(Docx.Field("MERGEFIELD Product.Name")),
+            Docx.P(Docx.Field("MERGEFIELD TableEnd:Items")),
+            Docx.P(Docx.Field("MERGEFIELD TableEnd:Orders")),
+            Docx.P(Docx.Field("MERGEFIELD TableStart:Orders")),
+            Docx.P(Docx.Field("MERGEFIELD Amount \\# \"0.00\"")),
+            Docx.P(Docx.Field("MERGEFIELD TableEnd:Orders")),
+            Docx.P(Docx.Field("MERGEFIELD TableStart:Empty")),
+            Docx.P(Docx.Field("MERGEFIELD TableEnd:Empty"))));
+
+        Assert.True(result.Valid);
+        Assert.Equal(new[] { "Orders", "Empty" }, result.Fields.Select(field => field.Name));
+        var orders = result.Fields[0];
+        Assert.Equal("array", orders.Type);
+        Assert.Empty(orders.Formats);
+        var children = orders.Fields!;
+        Assert.Equal(new[] { "Number", "Items", "Amount" }, children.Select(field => field.Name));
+        Assert.Equal("Product.Name", Assert.Single(children[1].Fields!).Name);
+        Assert.Empty(result.Fields[1].Fields!);
+        Assert.Empty(result.Fields[1].Formats);
+    }
+
+    [Fact]
+    public void Data_shape_ambiguity_is_case_sensitive_and_only_exact_kind_collision_warns()
+    {
+        var result = Validate(Docx.Create(
+            Docx.P(Docx.Field("MERGEFIELD Company")),
+            Docx.P(Docx.Field("MERGEFIELD Company.Name")),
+            Docx.P(Docx.Field("MERGEFIELD company")),
+            Docx.P(Docx.Field("MERGEFIELD TableStart:Company")),
+            Docx.P(Docx.Field("MERGEFIELD Child")),
+            Docx.P(Docx.Field("MERGEFIELD TableEnd:Company"))));
+
+        Assert.True(result.Valid);
+        Assert.Equal(new[] { "Company", "Company.Name", "company" }, result.Fields.Select(field => field.Name));
+        var warning = Assert.Single(result.Warnings);
+        Assert.Equal("template.field_kind_conflict", warning.Code);
+        Assert.Equal("Company", warning.Field);
+    }
+
+    [Fact]
+    public void Invalid_story_does_not_hide_trustworthy_fields_from_other_stories()
+    {
+        var result = Validate(Docx.CreateStories("/word/header1.xml",
+            Docx.P(Docx.Field("MERGEFIELD TableEnd:Broken"))));
+
+        Assert.False(result.Valid);
+        Assert.Equal("template.invalid_region", Assert.Single(result.Errors).Code);
+        Assert.Equal(new[] { "Name", "Empty", "Items" }, result.Fields.Select(field => field.Name));
+        Assert.Equal("Item", Assert.Single(result.Fields[2].Fields!).Name);
+    }
+
+    private static TemplateAnalysisResult Validate(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+        return Analyzer().Analyze(stream);
+    }
+
+    private static TemplateAnalyzer Analyzer()
     {
         var provider = new ServiceCollection().AddMonoReport().BuildServiceProvider();
-        return provider.GetRequiredService<TemplateValidator>();
+        return provider.GetRequiredService<TemplateAnalyzer>();
     }
 
     private sealed class NonSeekableReadStream(Stream inner) : Stream

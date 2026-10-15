@@ -108,32 +108,39 @@ public sealed class CliProcessTests
         };
         File.WriteAllBytes(path, bytes);
 
-        var result = await Run(directory, ["--validate", "--template", path]);
+        var result = await Run(directory, ["--analyze", "--template", path]);
 
         Assert.Equal(expectedExit, result.ExitCode);
         Assert.Empty(result.Error);
         using var json = JsonDocument.Parse(result.Output);
-        Assert.Equal(3, json.RootElement.EnumerateObject().Count());
+        Assert.Equal(4, json.RootElement.EnumerateObject().Count());
+        Assert.Equal(JsonValueKind.Array, json.RootElement.GetProperty("fields").ValueKind);
         Assert.Equal(expectedValid, json.RootElement.GetProperty("valid").GetBoolean());
         Assert.Equal(JsonValueKind.Array, json.RootElement.GetProperty("errors").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.RootElement.GetProperty("warnings").ValueKind);
         Assert.Equal(expectedValid ? 0 : 1, json.RootElement.GetProperty("errors").GetArrayLength());
+        if (expectedValid)
+        {
+            var field = Assert.Single(json.RootElement.GetProperty("fields").EnumerateArray());
+            Assert.Empty(Assert.Single(field.GetProperty("formats").EnumerateArray()).EnumerateArray());
+            Assert.False(field.TryGetProperty("switches", out _));
+        }
     }
 
     public static IEnumerable<object[]> InvalidValidationArguments()
     {
-        yield return new object[] { new[] { "--validate" } };
-        yield return new object[] { new[] { "--validate", "--template", "" } };
-        yield return new object[] { new[] { "--validate", "--template", "a", "--json", "{}" } };
-        yield return new object[] { new[] { "--json-file", "data.json", "--validate", "--template", "a" } };
-        yield return new object[] { new[] { "--validate", "--template", "a", "--stdin" } };
-        yield return new object[] { new[] { "--validate", "--template", "a", "--culture", "en-US" } };
-        yield return new object[] { new[] { "--validate", "--template", "a", "--output", "-" } };
-        yield return new object[] { new[] { "-o", "result.docx", "--validate", "-t", "a" } };
-        yield return new object[] { new[] { "--validate", "--template", "a", "--unknown" } };
-        yield return new object[] { new[] { "--validate", "--template", "a", "positional" } };
-        yield return new object[] { new[] { "--validate", "--validate", "--template", "a" } };
-        yield return new object[] { new[] { "--validate", "-t", "a", "--template", "b" } };
+        yield return new object[] { new[] { "--analyze" } };
+        yield return new object[] { new[] { "--analyze", "--template", "" } };
+        yield return new object[] { new[] { "--analyze", "--template", "a", "--json", "{}" } };
+        yield return new object[] { new[] { "--json-file", "data.json", "--analyze", "--template", "a" } };
+        yield return new object[] { new[] { "--analyze", "--template", "a", "--stdin" } };
+        yield return new object[] { new[] { "--analyze", "--template", "a", "--culture", "en-US" } };
+        yield return new object[] { new[] { "--analyze", "--template", "a", "--output", "-" } };
+        yield return new object[] { new[] { "-o", "result.docx", "--analyze", "-t", "a" } };
+        yield return new object[] { new[] { "--analyze", "--template", "a", "--unknown" } };
+        yield return new object[] { new[] { "--analyze", "--template", "a", "positional" } };
+        yield return new object[] { new[] { "--analyze", "--analyze", "--template", "a" } };
+        yield return new object[] { new[] { "--analyze", "-t", "a", "--template", "b" } };
     }
 
     [Theory]
@@ -150,12 +157,12 @@ public sealed class CliProcessTests
     public async Task Real_entry_point_validation_handles_help_and_missing_file()
     {
         var directory = EvidenceDirectory();
-        var help = await Run(directory, ["--validate", "--unknown", "--help"]);
+        var help = await Run(directory, ["--analyze", "--unknown", "--help"]);
         Assert.Equal(0, help.ExitCode);
-        Assert.Contains("--validate", Encoding.UTF8.GetString(help.Output));
+        Assert.Contains("--analyze", Encoding.UTF8.GetString(help.Output));
         Assert.Empty(help.Error);
 
-        var missing = await Run(directory, ["--validate", "--template", Path.Combine(directory, "missing.docx")]);
+        var missing = await Run(directory, ["--analyze", "--template", Path.Combine(directory, "missing.docx")]);
         Assert.Equal(1, missing.ExitCode);
         Assert.Empty(missing.Output);
         Assert.Contains("could not be completed", missing.Error);
@@ -167,7 +174,7 @@ public sealed class CliProcessTests
     {
         var directory = EvidenceDirectory();
         var template = Path.Combine(AppContext.BaseDirectory, "sample.template.docx");
-        var result = await Run(directory, ["--validate", "--template", template], keepInputOpen: true);
+        var result = await Run(directory, ["--analyze", "--template", template], keepInputOpen: true);
         Assert.Equal(0, result.ExitCode);
         Assert.Empty(result.Error);
         using var json = JsonDocument.Parse(result.Output);

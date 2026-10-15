@@ -4,7 +4,7 @@ namespace MonoReport.Api.Services;
 
 public sealed class MultipartRequestReader
 {
-    public async Task<IFormCollection> Read(HttpRequest request, bool validation, CancellationToken cancellation)
+    public async Task<IFormCollection> Read(HttpRequest request, bool analysis, CancellationToken cancellation)
     {
         if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var media) ||
             !string.Equals(media.MediaType.Value, "multipart/form-data", StringComparison.OrdinalIgnoreCase))
@@ -22,9 +22,9 @@ public sealed class MultipartRequestReader
             throw new RequestInputException(400, "request.invalid_multipart");
         }
         RequireFile(form, "template");
-        if (validation && (form.Keys.Any(key => key != "template") || form.Files.Any(f => f.Name != "template")))
+        if (analysis && (form.Keys.Any(key => key != "template") || form.Files.Any(f => f.Name != "template")))
             throw new RequestInputException(400, "request.unexpected_input");
-        if (!validation)
+        if (!analysis)
         {
             RequireText(form, "data", true);
             RequireText(form, "culture", false);

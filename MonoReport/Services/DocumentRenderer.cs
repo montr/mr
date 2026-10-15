@@ -23,6 +23,12 @@ namespace MonoReport.Services
         {
             var fields = _fieldParser.Parse(root, location);
             var regions = _regionParser.Parse(fields);
+            Render(root, location, context, fields, regions);
+        }
+
+        internal void Render(XElement root, string location, MergeContext context,
+            IReadOnlyList<FieldReference> fields, IReadOnlyList<Region> regions)
+        {
             for (var i = 0; i < fields.Count; i++)
             {
                 if (regions.Any(r => r.First <= i && i <= r.Last))

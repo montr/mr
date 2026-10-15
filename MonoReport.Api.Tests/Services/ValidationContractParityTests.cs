@@ -27,7 +27,7 @@ public sealed class ValidationContractParityTests
             var root = new DirectoryInfo(AppContext.BaseDirectory).Parent!.Parent!.Parent!.Parent!.FullName;
             var start = new ProcessStartInfo("dotnet") { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
             var configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent!.Name;
-            foreach (var argument in new[] { Path.Combine(root, "MonoReport.Cli", "bin", configuration, "net10.0", "MonoReport.Cli.dll"), "--validate", "--template", path }) start.ArgumentList.Add(argument);
+            foreach (var argument in new[] { Path.Combine(root, "MonoReport.Cli", "bin", configuration, "net10.0", "MonoReport.Cli.dll"), "--analyze", "--template", path }) start.ArgumentList.Add(argument);
             using var process = Process.Start(start)!;
             var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
             try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(15)); }
@@ -36,7 +36,7 @@ public sealed class ValidationContractParityTests
             Assert.Equal(kind == "valid" ? 0 : 1, process.ExitCode);
             using var cli = JsonDocument.Parse(await stdout);
             using var factory = new WebApplicationFactory<Program>(); using var client = factory.CreateClient();
-            using var form = HttpApiTests.Form(bytes); using var response = await client.PostAsync("/api/documents/validate", form);
+            using var form = HttpApiTests.Form(bytes); using var response = await client.PostAsync("/api/documents/analyze", form);
             Assert.Equal(200, (int)response.StatusCode);
             using var http = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             Assert.True(JsonElement.DeepEquals(cli.RootElement, http.RootElement));

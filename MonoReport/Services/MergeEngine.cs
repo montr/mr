@@ -1,17 +1,15 @@
 using System.Text.Json;
-using System.Xml;
 using System.Xml.Linq;
-using DocumentFormat.OpenXml.Packaging;
 using MonoReport.Models;
 
 namespace MonoReport.Services
 {
     public sealed class MergeEngine(DocumentRenderer renderer, DocxStoryReader storyReader,
-        TemplateStructureValidator structureValidator)
+        TemplateAnalyzer analyzer)
     {
         private readonly DocumentRenderer _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
         private readonly DocxStoryReader _storyReader = storyReader ?? throw new ArgumentNullException(nameof(storyReader));
-        private readonly TemplateStructureValidator _structureValidator = structureValidator ?? throw new ArgumentNullException(nameof(structureValidator));
+        private readonly TemplateAnalyzer _analyzer = analyzer ?? throw new ArgumentNullException(nameof(analyzer));
 
         /// <summary>Reads the template from its current position. The caller retains ownership of both inputs.</summary>
         public MergeResult Merge(Stream template, JsonDocument data, MergeOptions? options = null)
@@ -31,48 +29,21 @@ namespace MonoReport.Services
                 output.Position = 0;
                 using (var document = _storyReader.Open(output, true))
                 {
-                    var stories = _storyReader.Read(document);
-                    foreach (var (part, xml) in stories)
+                    var analysis = _analyzer.Inspect(document);
+                    var error = analysis.Diagnostics.FirstOrDefault();
+                    if (error is not null) throw error.ToException();
+                    foreach (var story in analysis.Stories)
                     {
-                        var error = _structureValidator.Inspect(xml.Root!, part.Uri.ToString()).FirstOrDefault();
-                        if (error is not null) throw error.ToException();
-                    }
-
-                    foreach (var (part, xml) in stories)
-                    {
-                        _renderer.Render(xml.Root!, part.Uri.ToString(), context);
-                        using (var target = part.GetStream(FileMode.Create, FileAccess.Write))
+                        _renderer.Render(story.Xml.Root!, story.Part.Uri.ToString(), context,
+                            story.Fields, story.Regions);
+                        using (var target = story.Part.GetStream(FileMode.Create, FileAccess.Write))
                         {
-                            xml.Save(target, SaveOptions.DisableFormatting);
+                            story.Xml.Save(target, SaveOptions.DisableFormatting);
                         }
                     }
                 }
 
                 return new(output.ToArray(), context.Warnings.AsReadOnly());
-            }
-        }
-
-        private static IEnumerable<OpenXmlPart> StoryParts(MainDocumentPart main)
-        {
-            yield return main;
-            foreach (var header in main.HeaderParts)
-            {
-                yield return header;
-            }
-
-            foreach (var footer in main.FooterParts)
-            {
-                yield return footer;
-            }
-
-            if (main.FootnotesPart is not null)
-            {
-                yield return main.FootnotesPart;
-            }
-
-            if (main.EndnotesPart is not null)
-            {
-                yield return main.EndnotesPart;
             }
         }
     }

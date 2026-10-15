@@ -19,7 +19,7 @@ public sealed class HttpApiTests
     public async Task Validation_collects_independent_story_errors_in_deterministic_order()
     {
         using var factory = new WebApplicationFactory<Program>(); using var client = factory.CreateClient();
-        using var form = Form(MultiStoryErrors()); using var response = await client.PostAsync("/api/documents/validate", form); response.EnsureSuccessStatusCode();
+        using var form = Form(MultiStoryErrors()); using var response = await client.PostAsync("/api/documents/analyze", form); response.EnsureSuccessStatusCode();
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var errors = json.RootElement.GetProperty("errors").EnumerateArray().ToArray();
         Assert.Equal(2, errors.Length);
@@ -53,7 +53,7 @@ public sealed class HttpApiTests
             writer.Write(kind == "xml" ? "<broken" : new XElement(WordXml.DocumentElementName).ToString());
         }
         using var factory = new WebApplicationFactory<Program>(); using var client = factory.CreateClient();
-        foreach (var endpoint in new[] { "validate", "generate" })
+        foreach (var endpoint in new[] { "analyze", "generate" })
         {
             using var form = Form(bytes.ToArray(), endpoint == "generate" ? "{}" : null);
             using var response = await client.PostAsync($"/api/documents/{endpoint}", form);
@@ -77,11 +77,11 @@ public sealed class HttpApiTests
     }
 
     [Theory]
-    [InlineData("validate")]
+    [InlineData("analyze")]
     [InlineData("generate")]
     public async Task Unexpected_service_failures_are_sanitized_on_both_endpoints(string endpoint)
     {
-        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.ConfigureServices(s => s.AddTransient<TemplateValidator>(_ => throw new IOException("SECRET /private/server/file"))));
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.ConfigureServices(s => s.AddTransient<TemplateAnalyzer>(_ => throw new IOException("SECRET /private/server/file"))));
         using var client = factory.CreateClient();
         using var form = Form(Docx.Create(Docx.P(Docx.Run("ok"))), endpoint == "generate" ? "{}" : null);
         using var response = await client.PostAsync($"/api/documents/{endpoint}", form);
@@ -127,7 +127,7 @@ public sealed class HttpApiTests
             await File.WriteAllBytesAsync(Path.Combine(evidence, "invalid-template.docx"), template);
         }
         using var factory = new WebApplicationFactory<Program>(); using var client = factory.CreateClient();
-        using var form = Form(template); using var response = await client.PostAsync("/api/documents/validate", form);
+        using var form = Form(template); using var response = await client.PostAsync("/api/documents/analyze", form);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.False(json.RootElement.GetProperty("valid").GetBoolean());
@@ -162,7 +162,7 @@ public sealed class HttpApiTests
     }
 
     [Theory]
-    [InlineData("validate")]
+    [InlineData("analyze")]
     [InlineData("generate")]
     public async Task Request_contract_categories_have_safe_problem_details(string endpoint)
     {
@@ -195,7 +195,7 @@ public sealed class HttpApiTests
         var wrong = new MultipartFormDataContent(); wrong.Add(new StringContent("path.docx"), "template");
         if (endpoint == "generate") wrong.Add(new StringContent("{}"), "data");
         await Check(wrong, 400, "request.invalid_input");
-        if (endpoint == "validate")
+        if (endpoint == "analyze")
         {
             foreach (var extra in new[] { "data", "culture", "unknown" })
             {
@@ -255,7 +255,7 @@ public sealed class HttpApiTests
         Assert.DoesNotContain("SECRET", body);
         Assert.Contains("server.internal_error", body);
         using var recovery = Form(Docx.Create(Docx.P(Docx.Run("ok"))));
-        using var recovered = await client.PostAsync("/api/documents/validate", recovery);
+        using var recovered = await client.PostAsync("/api/documents/analyze", recovery);
         Assert.Equal(HttpStatusCode.OK, recovered.StatusCode);
     }
 
@@ -293,13 +293,33 @@ public sealed class HttpApiTests
     {
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseEnvironment("Development"));
         using var client = factory.CreateClient();
-        using var form = Form(Docx.Create(Docx.P(Docx.Field("MERGEFIELD Missing \\* Unavailable"))));
-        using var response = await client.PostAsync("/api/documents/validate", form);
+        using var form = Form(Docx.Create(
+            Docx.P(Docx.Field("MERGEFIELD Missing \\* Upper")),
+            Docx.P(Docx.Field("MERGEFIELD TableStart:Items")),
+            Docx.P(Docx.Field("MERGEFIELD Product.Name")),
+            Docx.P(Docx.Field("MERGEFIELD TableEnd:Items"))));
+        using var response = await client.PostAsync("/api/documents/analyze", form);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var result = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.True(result.RootElement.GetProperty("valid").GetBoolean());
         Assert.Empty(result.RootElement.GetProperty("errors").EnumerateArray());
         Assert.Empty(result.RootElement.GetProperty("warnings").EnumerateArray());
+        var fields = result.RootElement.GetProperty("fields");
+        Assert.Equal(new[] { "Missing", "Items" }, fields.EnumerateArray().Select(field => field.GetProperty("name").GetString()));
+        Assert.False(fields[0].TryGetProperty("fields", out _));
+        Assert.Equal("general", fields[0].GetProperty("formats")[0][0].GetProperty("kind").GetString());
+        Assert.Empty(fields[1].GetProperty("formats").EnumerateArray());
+        Assert.Equal("Product.Name", fields[1].GetProperty("fields")[0].GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task Removed_validation_route_is_not_available()
+    {
+        using var factory = new WebApplicationFactory<Program>();
+        using var client = factory.CreateClient();
+        using var form = Form(Docx.Create(Docx.P(Docx.Run("plain"))));
+        using var response = await client.PostAsync("/api/documents/validate", form);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -307,12 +327,12 @@ public sealed class HttpApiTests
     {
         using var factory = new WebApplicationFactory<Program>();
         using var client = factory.CreateClient();
-        foreach (var endpoint in new[] { "validate", "generate" })
+        foreach (var endpoint in new[] { "analyze", "generate" })
         {
             using var form = Form([1, 2, 3], endpoint == "generate" ? "{}" : null);
             using var response = await client.PostAsync($"/api/documents/{endpoint}", form);
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            if (endpoint == "validate")
+            if (endpoint == "analyze")
             {
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 Assert.False(json.RootElement.GetProperty("valid").GetBoolean());

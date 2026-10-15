@@ -7,13 +7,13 @@ using MonoReport.Services;
 
 namespace MonoReport.Cli.Services
 {
-    public sealed class CliApplication(CliOptionsParser parser, MergeEngine engine, TemplateValidator validator)
+    public sealed class CliApplication(CliOptionsParser parser, MergeEngine engine, TemplateAnalyzer analyzer)
     {
         private const string HelpText = """
             MonoReport.Cli --template <template.docx> [--output <result.docx>]
                    [--json <JSON> | --json-file <data.json> | --stdin]
                    [--culture <culture>]
-            MonoReport.Cli --validate --template <template.docx>
+            MonoReport.Cli --analyze --template <template.docx>
 
             -t, --template   Required DOCX template path.
             -o, --output     Output DOCX path. Omit or use '-' for binary stdout.
@@ -21,17 +21,17 @@ namespace MonoReport.Cli.Services
             --json-file      UTF-8 JSON file path.
             --stdin          Read UTF-8 JSON from stdin (default when no source is specified).
             --culture        Formatting culture, e.g. ru-RU. Default: invariant culture.
-            --validate       Validate template structure only; accepts only --template.
+            --analyze        Analyze template structure and fields; accepts only --template.
             -h, --help       Show this help.
 
             Exit codes: 0 success, 1 input/render/output error, 2 invalid arguments.
             Errors are written to stderr; DOCX output on stdout is binary.
-            Validation writes JSON to stdout: 0 valid, 1 invalid/execution failure, 2 invalid arguments.
+            Analysis writes JSON to stdout: 0 valid, 1 invalid/execution failure, 2 invalid arguments.
             """;
 
         private readonly CliOptionsParser _parser = parser ?? throw new ArgumentNullException(nameof(parser));
         private readonly MergeEngine _engine = engine ?? throw new ArgumentNullException(nameof(engine));
-        private readonly TemplateValidator _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+        private readonly TemplateAnalyzer _analyzer = analyzer ?? throw new ArgumentNullException(nameof(analyzer));
 
         public int Run(string[] args, Stream standardInput, Stream standardOutput, TextWriter diagnostics)
         {
@@ -59,9 +59,9 @@ namespace MonoReport.Cli.Services
                     return 0;
                 }
 
-                if (options.Validate)
+                if (options.Analyze)
                 {
-                    return Validate(options, standardOutput, diagnostics);
+                    return Analyze(options, standardOutput, diagnostics);
                 }
 
                 var json = ReadJson(options, standardInput);
@@ -97,14 +97,14 @@ namespace MonoReport.Cli.Services
             }
         }
 
-        private int Validate(CliOptions options, Stream standardOutput, TextWriter diagnostics)
+        private int Analyze(CliOptions options, Stream standardOutput, TextWriter diagnostics)
         {
             try
             {
-                TemplateValidationResult result;
+                TemplateAnalysisResult result;
                 using (var template = File.OpenRead(options.TemplatePath))
                 {
-                    result = _validator.Validate(template);
+                    result = _analyzer.Analyze(template);
                 }
 
                 var bytes = JsonSerializer.SerializeToUtf8Bytes(result, new JsonSerializerOptions
@@ -117,7 +117,7 @@ namespace MonoReport.Cli.Services
             }
             catch (Exception)
             {
-                diagnostics.WriteLine("Template validation could not be completed.");
+                diagnostics.WriteLine("Template analysis could not be completed.");
                 return 1;
             }
         }

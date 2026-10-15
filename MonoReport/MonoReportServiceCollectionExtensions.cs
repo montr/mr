@@ -11,7 +11,7 @@ public static class MonoReportServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddTransient<MergeEngine>();
-        services.TryAddTransient<TemplateValidator>();
+        services.TryAddTransient<TemplateAnalyzer>();
         services.TryAddTransient<DocxStoryReader>();
         services.TryAddTransient<TemplateStructureValidator>();
         services.TryAddTransient<DocumentRenderer>();

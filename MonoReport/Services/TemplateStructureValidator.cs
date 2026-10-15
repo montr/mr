@@ -14,12 +14,24 @@ public sealed class TemplateStructureValidator(OoxmlFieldParser fieldParser, Reg
     }
 
     internal IReadOnlyList<StructuralDiagnostic> Inspect(XElement root, string part)
+        => Analyze(root, part).Diagnostics;
+
+    internal StoryStructureAnalysis Analyze(XElement root, string part)
     {
         var inspection = _fieldParser.Inspect(root, part);
         var errors = inspection.Diagnostics.ToList();
+        IReadOnlyList<Region> regions = [];
+        var hierarchyIsSafe = inspection.StructureIsSafe;
         if (inspection.StructureIsSafe)
-            errors.AddRange(_regionParser.Inspect(inspection.Fields));
-        return errors;
+        {
+            var regionErrors = _regionParser.Inspect(inspection.Fields);
+            errors.AddRange(regionErrors);
+            hierarchyIsSafe = regionErrors.Count == 0 && inspection.Diagnostics.All(diagnostic =>
+                diagnostic.Code != "template.invalid_field_syntax" || !LooksLikeRegion(diagnostic.Field));
+            if (regionErrors.Count == 0)
+                regions = _regionParser.Parse(inspection.Fields);
+        }
+        return new(inspection.Fields, regions, errors, hierarchyIsSafe);
     }
 
     internal TemplateValidationIssue Issue(StructuralDiagnostic error, string? part = null) =>
@@ -37,4 +49,8 @@ public sealed class TemplateStructureValidator(OoxmlFieldParser fieldParser, Reg
         "template.unsupported_nested_field" => "Nested Word fields inside MERGEFIELD results are unsupported.",
         _ => "The template is invalid."
     };
+
+    private static bool LooksLikeRegion(string? field) => field is not null &&
+        (field.StartsWith(WordFieldCodes.RegionStartPrefix, StringComparison.OrdinalIgnoreCase) ||
+         field.StartsWith(WordFieldCodes.RegionEndPrefix, StringComparison.OrdinalIgnoreCase));
 }

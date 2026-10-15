@@ -49,9 +49,10 @@ curl --silent --show-error --fail --location --max-time 10 -D "$work/docs.header
 grep -qi '^Content-Type: text/html' "$work/docs.headers"
 grep -q 'MonoReport API' "$work/docs.html"
 
-validate_status="$(curl --silent --show-error --max-time 20 -o "$work/validate.json" -w '%{http_code}' -F "template=@Samples/sample.template.docx" "$root/api/documents/validate")"
-test "$validate_status" = "200"
-grep -q '"valid":true' "$work/validate.json"
+analyze_status="$(curl --silent --show-error --max-time 20 -o "$work/analyze.json" -w '%{http_code}' -F "template=@Samples/sample.template.docx" "$root/api/documents/analyze")"
+test "$analyze_status" = "200"
+grep -q '"valid":true' "$work/analyze.json"
+grep -q '"fields":' "$work/analyze.json"
 
 for path in /api/not-real /docs/not-real /openapi/not-real /missing.js; do
   status="$(curl --silent --show-error --max-time 10 -D "$work/not-found.headers" -o "$work/not-found.body" -w '%{http_code}' "$root$path")"

@@ -35,12 +35,12 @@ public sealed class ApiHostTests
                 await Task.Delay(100);
             }
             Assert.True(ready, "Local API host did not become ready.");
-            foreach (var endpoint in new[] { "validate", "generate" })
+            foreach (var endpoint in new[] { "analyze", "generate" })
             {
                 foreach (var streamed in new[] { false, true })
                 {
                     using var multipart = HttpApiTests.Form(new byte[5000], endpoint == "generate" ? new string(' ', 5000) : null);
-                    if (endpoint == "validate") multipart.Add(new ByteArrayContent(new byte[5000]), "extra", "extra.docx");
+                    if (endpoint == "analyze") multipart.Add(new ByteArrayContent(new byte[5000]), "extra", "extra.docx");
                     using HttpContent content = streamed ? new StreamingContent(multipart) : multipart;
                     using var response = await client.PostAsync($"/api/documents/{endpoint}", content);
                     Assert.True(response.StatusCode == HttpStatusCode.RequestEntityTooLarge,

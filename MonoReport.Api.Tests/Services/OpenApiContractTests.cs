@@ -16,14 +16,15 @@ public sealed class OpenApiContractTests
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var root = document.RootElement;
         Assert.False(root.TryGetProperty("security", out _));
-        foreach (var name in new[] { "generate", "validate" })
+        Assert.False(root.GetProperty("paths").TryGetProperty("/api/documents/validate", out _));
+        foreach (var name in new[] { "generate", "analyze" })
         {
             var operation = root.GetProperty("paths").GetProperty($"/api/documents/{name}").GetProperty("post");
             var schema = operation.GetProperty("requestBody").GetProperty("content").GetProperty("multipart/form-data").GetProperty("schema");
             Assert.True(operation.GetProperty("requestBody").GetProperty("required").GetBoolean());
             Assert.Equal("binary", schema.GetProperty("properties").GetProperty("template").GetProperty("format").GetString());
             Assert.Equal(name == "generate" ? new[] { "template", "data" } : new[] { "template" }, schema.GetProperty("required").EnumerateArray().Select(x => x.GetString()).ToArray());
-            if (name == "validate") Assert.Single(schema.GetProperty("properties").EnumerateObject());
+            if (name == "analyze") Assert.Single(schema.GetProperty("properties").EnumerateObject());
             else Assert.Equal("string", schema.GetProperty("properties").GetProperty("data").GetProperty("type").GetString());
             var responses = operation.GetProperty("responses");
             Assert.Equal(name == "generate" ? new[] { "200", "400", "413", "415", "422", "500" } : new[] { "200", "400", "413", "415", "500" }, responses.EnumerateObject().Select(x => x.Name).Order().ToArray());
@@ -39,13 +40,31 @@ public sealed class OpenApiContractTests
             else Assert.True(responses.GetProperty("200").GetProperty("content").TryGetProperty("application/json", out _));
         }
         var schemas = root.GetProperty("components").GetProperty("schemas");
-        var result = schemas.GetProperty("TemplateValidationResult");
-        foreach (var key in new[] { "valid", "errors", "warnings" }) Assert.True(result.GetProperty("properties").TryGetProperty(key, out _));
-        Assert.Equal(new[] { "errors", "valid", "warnings" }, result.GetProperty("required").EnumerateArray().Select(x => x.GetString()).Order().ToArray());
+        var result = schemas.GetProperty("TemplateAnalysisResult");
+        foreach (var key in new[] { "valid", "errors", "warnings", "fields" }) Assert.True(result.GetProperty("properties").TryGetProperty(key, out _));
+        Assert.Equal(new[] { "errors", "fields", "valid", "warnings" }, result.GetProperty("required").EnumerateArray().Select(x => x.GetString()).Order().ToArray());
         var issue = schemas.GetProperty("TemplateValidationIssue");
         foreach (var key in new[] { "code", "message", "field", "part", "location" }) Assert.True(issue.GetProperty("properties").TryGetProperty(key, out _));
         foreach (var key in new[] { "field", "part", "location" }) Assert.Contains("null", issue.GetProperty("properties").GetProperty(key).GetProperty("type").EnumerateArray().Select(x => x.GetString()));
+        var field = schemas.GetProperty("TemplateField");
+        foreach (var key in new[] { "name", "type", "formats", "fields" }) Assert.True(field.GetProperty("properties").TryGetProperty(key, out _));
+        Assert.False(field.GetProperty("properties").TryGetProperty("switches", out _));
+        Assert.Equal(new[] { "formats", "name", "type" }, field.GetProperty("required").EnumerateArray().Select(x => x.GetString()).Order().ToArray());
+        var formats = field.GetProperty("properties").GetProperty("formats");
+        Assert.Contains("array", SchemaTypes(formats));
+        Assert.Contains("array", SchemaTypes(formats.GetProperty("items")));
+        Assert.EndsWith("/TemplateFieldSwitch", formats.GetProperty("items").GetProperty("items").GetProperty("$ref").GetString());
+        var fieldSwitch = schemas.GetProperty("TemplateFieldSwitch");
+        Assert.Equal(new[] { "kind", "value" }, fieldSwitch.GetProperty("required").EnumerateArray().Select(x => x.GetString()).Order().ToArray());
         using var docs = await client.GetAsync("/docs"); docs.EnsureSuccessStatusCode(); Assert.Contains("swagger", await docs.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<string?> SchemaTypes(JsonElement schema)
+    {
+        var type = schema.GetProperty("type");
+        return type.ValueKind == JsonValueKind.Array
+            ? type.EnumerateArray().Select(item => item.GetString()).ToArray()
+            : [type.GetString()];
     }
 
     [Theory]

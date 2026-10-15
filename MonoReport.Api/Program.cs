@@ -49,8 +49,8 @@ app.UseStaticFiles();
 app.MapPost("/api/documents/generate", (HttpContext context, DocumentEndpoints endpoints) => endpoints.Generate(context))
     .WithName("GenerateDocument").Produces(200, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     .ProducesProblem(400).ProducesProblem(413).ProducesProblem(415).ProducesProblem(422).ProducesProblem(500);
-app.MapPost("/api/documents/validate", (HttpContext context, DocumentEndpoints endpoints) => endpoints.Validate(context))
-    .WithName("ValidateTemplate").Produces<TemplateValidationResult>()
+app.MapPost("/api/documents/analyze", (HttpContext context, DocumentEndpoints endpoints) => endpoints.Analyze(context))
+    .WithName("AnalyzeTemplate").Produces<TemplateAnalysisResult>()
     .ProducesProblem(400).ProducesProblem(413).ProducesProblem(415).ProducesProblem(500);
 
 if (builder.Configuration.GetValue<bool?>("MonoReport:DocumentationEnabled") ?? true)

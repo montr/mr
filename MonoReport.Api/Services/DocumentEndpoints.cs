@@ -5,11 +5,11 @@ using MonoReport.Services;
 
 namespace MonoReport.Api.Services;
 
-public sealed class DocumentEndpoints(MultipartRequestReader reader, MergeEngine engine, TemplateValidator validator, GenerationOptionsFactory options)
+public sealed class DocumentEndpoints(MultipartRequestReader reader, MergeEngine engine, TemplateAnalyzer analyzer, GenerationOptionsFactory options)
 {
     private readonly MultipartRequestReader _reader = reader ?? throw new ArgumentNullException(nameof(reader));
     private readonly MergeEngine _engine = engine ?? throw new ArgumentNullException(nameof(engine));
-    private readonly TemplateValidator _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+    private readonly TemplateAnalyzer _analyzer = analyzer ?? throw new ArgumentNullException(nameof(analyzer));
     private readonly GenerationOptionsFactory _options = options ?? throw new ArgumentNullException(nameof(options));
 
     public async Task<IResult> Generate(HttpContext context)
@@ -34,10 +34,10 @@ public sealed class DocumentEndpoints(MultipartRequestReader reader, MergeEngine
         }
     }
 
-    public async Task<IResult> Validate(HttpContext context)
+    public async Task<IResult> Analyze(HttpContext context)
     {
         var form = await _reader.Read(context.Request, true, context.RequestAborted);
         using var template = form.Files.GetFile("template")!.OpenReadStream();
-        return Results.Json(_validator.Validate(template));
+        return Results.Json(_analyzer.Analyze(template));
     }
 }

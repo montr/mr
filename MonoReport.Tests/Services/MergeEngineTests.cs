@@ -120,5 +120,27 @@ namespace MonoReport.Tests.Services
                 }
             }
         }
+
+        [Fact]
+        public void Original_story_is_parsed_once_while_rendering_uses_analyzed_references()
+        {
+            var inspections = 0;
+            var fieldParser = new OoxmlFieldParser(new FieldCodeParser(), _ => inspections++);
+            var regions = new RegionParser();
+            var storyReader = new DocxStoryReader();
+            var renderer = new DocumentRenderer(new DataResolver(), fieldParser, regions,
+                new ValueFormatter(new FormatterRegistry(new Dictionary<string, IValueFormatter>())),
+                new CachedResultWriter());
+            var analyzer = new TemplateAnalyzer(storyReader,
+                new TemplateStructureValidator(fieldParser, regions));
+            var engine = new MergeEngine(renderer, storyReader, analyzer);
+            using var template = new MemoryStream(Docx.Create(Docx.P(Docx.Field("MERGEFIELD Name"))));
+            using var data = JsonDocument.Parse("""{"Name":"rendered"}""");
+
+            var result = engine.Merge(template, data);
+
+            Assert.Equal(1, inspections);
+            Assert.Equal("rendered", Docx.Text(Docx.Read(result.Document)));
+        }
     }
 }
