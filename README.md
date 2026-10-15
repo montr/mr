@@ -49,7 +49,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000`. The development server proxies relative `/api` requests to the local API. Set `MONOREPORT_API_URL` before `npm run dev` only when the API uses another local origin. The browser sends the selected template and JSON only when Generate is pressed; the UI has no persistence, analytics, or alternate generation backend.
+Open `http://localhost:3000`. The development server proxies relative `/api` requests to the local API. Set `MONOREPORT_API_URL` before `npm run dev` only when the API uses another local origin. Generate sends the selected template and JSON to document generation. Generate JSON explicitly analyzes the selected template and creates an editable example with empty string values and one example item per collection; it confirms before replacing nonempty editor content. The UI has no persistence, analytics, or alternate generation backend.
 
 Run the focused frontend checks from `MonoReport.UI`:
 

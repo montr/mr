@@ -21,6 +21,8 @@ const success = (bytes = new Uint8Array([80, 75, 7, 8])) => {
   const blob = new Blob([bytes], { type: mime });
   return { ok: true, status: 200, blob: async () => blob, headers: new Headers({ "Content-Type": mime, "Content-Disposition": "attachment; filename=generated.docx" }) } as Response;
 };
+const analysis = (fields: unknown[] = [{ name: "Company.Name", type: "string", formats: [[]] }], valid = true) =>
+  new Response(JSON.stringify({ valid, errors: valid ? [] : [{ code: "template.invalid_region", message: "Invalid region" }], warnings: [], fields }), { status: 200, headers: { "Content-Type": "application/json" } });
 
 async function selectTemplate(user: ReturnType<typeof userEvent.setup>, file = template()) {
   await user.upload(screen.getByLabelText("Template and input data").querySelector("input[type=file]") as HTMLInputElement, file);
@@ -35,6 +37,7 @@ describe("MonoReport playground", () => {
     expect(screen.getByRole("button", { name: "Form" })).toBeDisabled();
     expect(screen.getByLabelText("JSON data")).toHaveValue("{}");
     expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Generate JSON" })).toBeDisabled();
     const repositoryLink = screen.getByRole("link", { name: "MonoReport" });
     expect(repositoryLink).toHaveAttribute("href", "https://github.com/montr/monoreport");
     expect(repositoryLink.querySelector("svg")).not.toBeNull();
@@ -58,7 +61,7 @@ describe("MonoReport playground", () => {
     await user.click(screen.getByRole("button", { name: "Format" }));
     expect(editor).toHaveValue("{");
     expect(screen.getByText("Invalid JSON")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Generate/ }));
+    await user.click(screen.getByRole("button", { name: "Generate document" }));
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -74,7 +77,7 @@ describe("MonoReport playground", () => {
     fireEvent.drop(screen.getByLabelText("Preview").querySelector(".canvas")!, { dataTransfer: { files: [replacement], types: ["Files"] } });
     expect(screen.getByText("second.docx")).toBeInTheDocument();
     expect(editor).toHaveValue('{"kept":true}');
-    await user.click(screen.getByRole("button", { name: /Generate/ }));
+    await user.click(screen.getByRole("button", { name: "Generate document" }));
     await screen.findByText("Result preview");
     expect(screen.getByRole("button", { name: /Download/ })).toBeEnabled();
     fireEvent.drop(screen.getByLabelText("Preview").querySelector(".canvas")!, { dataTransfer: { files: [new File([new Uint8Array([1])], "bad.pdf")], types: ["Files"] } });
@@ -97,7 +100,7 @@ describe("MonoReport playground", () => {
     render(<App />);
     await selectTemplate(user);
     expect(fetchMock).not.toHaveBeenCalled();
-    const generate = screen.getByRole("button", { name: /Generate/ });
+    const generate = screen.getByRole("button", { name: "Generate document" });
     await user.click(generate);
     expect(generate).toBeDisabled();
     await user.click(generate);
@@ -118,7 +121,7 @@ describe("MonoReport playground", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ errors: [{ code: "first", message: "First issue" }, { code: "second", detail: "Second issue" }] }), { status: 422, headers: { "Content-Type": "application/problem+json" } })));
     render(<App />);
     await selectTemplate(user);
-    await user.click(screen.getByRole("button", { name: /Generate/ }));
+    await user.click(screen.getByRole("button", { name: "Generate document" }));
     expect(await screen.findByText("2 errors")).toBeInTheDocument();
     expect(screen.getByText(/First issue/)).toBeInTheDocument();
     expect(screen.getByText(/Second issue/)).toBeInTheDocument();
@@ -131,13 +134,13 @@ describe("MonoReport playground", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
     await selectTemplate(user);
-    await user.click(screen.getByRole("button", { name: /Generate/ }));
+    await user.click(screen.getByRole("button", { name: "Generate document" }));
     await screen.findByText("Result preview");
     expect(screen.getByRole("button", { name: /Download/ })).toBeEnabled();
     await user.type(screen.getByLabelText("JSON data"), " ");
     expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Result" })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: /Generate/ }));
+    await user.click(screen.getByRole("button", { name: "Generate document" }));
     expect(await screen.findByText(/generation.invalid_data/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
   });
@@ -148,10 +151,81 @@ describe("MonoReport playground", () => {
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(done => { resolve = done; })));
     render(<App />);
     await selectTemplate(user);
-    await user.click(screen.getByRole("button", { name: /Generate/ }));
+    await user.click(screen.getByRole("button", { name: "Generate document" }));
     await user.type(screen.getByLabelText("JSON data"), " ");
     resolve(success());
     await waitFor(() => expect(screen.getByRole("button", { name: "Result" })).toBeDisabled());
     expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
+  });
+
+  it("analyzes only on explicit action, confirms replacement, and invalidates an existing Result", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const fetchMock = vi.fn().mockResolvedValueOnce(success()).mockResolvedValueOnce(analysis([
+      { name: "Company.Name", type: "string", formats: [[{ kind: "general", value: "Upper" }]] },
+      { name: "Orders", type: "array", formats: [], fields: [{ name: "Number", type: "string", formats: [[]] }] }
+    ]));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    await selectTemplate(user);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Generate document" }));
+    await screen.findByText("Result preview");
+
+    await user.click(screen.getByRole("button", { name: "Generate JSON" }));
+
+    await waitFor(() => expect(screen.getByLabelText("JSON data")).toHaveValue(JSON.stringify({ Company: { Name: "" }, Orders: [{ Number: "" }] }, null, 2)));
+    expect(confirm).toHaveBeenCalledWith("Replace current JSON with generated example?");
+    expect(screen.getByRole("button", { name: "Result" })).toBeDisabled();
+    const [, analysisInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect((analysisInit.body as FormData).get("template")).toBe(previewSources[0]);
+  });
+
+  it("does not confirm for empty JSON and leaves nonempty JSON unchanged when replacement is cancelled", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(analysis())));
+    render(<App />);
+    await selectTemplate(user);
+    const editor = screen.getByLabelText("JSON data");
+    fireEvent.change(editor, { target: { value: "" } });
+    await user.click(screen.getByRole("button", { name: "Generate JSON" }));
+    await waitFor(() => expect(editor).toHaveValue(JSON.stringify({ Company: { Name: "" } }, null, 2)));
+    expect(confirm).not.toHaveBeenCalled();
+
+    fireEvent.change(editor, { target: { value: "keep me" } });
+    await user.click(screen.getByRole("button", { name: "Generate JSON" }));
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
+    expect(editor).toHaveValue("keep me");
+  });
+
+  it("never applies stale analysis after JSON or template changes", async () => {
+    const user = userEvent.setup();
+    const resolvers: Array<(response: Response) => void> = [];
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => resolvers.push(resolve))));
+    render(<App />);
+    await selectTemplate(user);
+    const editor = screen.getByLabelText("JSON data");
+    await user.click(screen.getByRole("button", { name: "Generate JSON" }));
+    fireEvent.change(editor, { target: { value: "edited during analysis" } });
+    resolvers[0](analysis());
+    await waitFor(() => expect(editor).toHaveValue("edited during analysis"));
+
+    await user.click(screen.getByRole("button", { name: "Generate JSON" }));
+    const replacement = new File([new Uint8Array([1])], "replacement.docx", { type: mime });
+    fireEvent.drop(screen.getByLabelText("Preview").querySelector(".canvas")!, { dataTransfer: { files: [replacement], types: ["Files"] } });
+    resolvers[1](analysis([{ name: "Stale", type: "string", formats: [[]] }]));
+    await waitFor(() => expect(screen.getByText("replacement.docx")).toBeInTheDocument());
+    expect(editor).toHaveValue("edited during analysis");
+  });
+
+  it("shows analysis failures without replacing JSON", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(analysis([], false)));
+    render(<App />);
+    await selectTemplate(user);
+    await user.click(screen.getByRole("button", { name: "Generate JSON" }));
+    expect(await screen.findByText("template.invalid_region", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByLabelText("JSON data")).toHaveValue("{}");
   });
 });

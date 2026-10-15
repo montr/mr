@@ -3,12 +3,15 @@ import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 import { DocxPreview } from "./components/DocxPreview";
 import { MonacoJsonEditor } from "./components/MonacoJsonEditor";
 import { Splitter } from "./components/Splitter";
+import { analyzeTemplate, AnalysisFailure } from "./services/analysis";
 import { generateDocument, GenerationFailure } from "./services/generation";
+import { fieldsToSampleJson } from "./services/sampleJson";
 import type { Diagnostic, GeneratedDocument } from "./types";
 import "./styles.css";
 import "./mobile.css";
 
 type Tab = "template" | "result" | "errors";
+type Operation = "generate" | "analyze";
 const repositoryUrl = "https://github.com/montr/monoreport";
 
 function diagnostic(title: string, detail: string): Diagnostic[] {
@@ -37,15 +40,18 @@ export default function App() {
   const [result, setResult] = useState<GeneratedDocument>();
   const [errors, setErrors] = useState<Diagnostic[]>([]);
   const [active, setActive] = useState<Tab>("template");
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState<Operation>();
   const [copyLabel, setCopyLabel] = useState("Copy");
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const revision = useRef(0);
   const request = useRef<AbortController | undefined>(undefined);
+  const currentTemplate = useRef<File | undefined>(undefined);
+  const currentJson = useRef(json);
   const copyTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => () => {
+    revision.current += 1;
     request.current?.abort();
     if (copyTimer.current) window.clearTimeout(copyTimer.current);
   }, []);
@@ -54,7 +60,7 @@ export default function App() {
     revision.current += 1;
     request.current?.abort();
     request.current = undefined;
-    setPending(false);
+    setPending(undefined);
     setResult(undefined);
     setActive(current => current === "result" ? nextTab : current);
   }
@@ -66,6 +72,7 @@ export default function App() {
       return;
     }
     invalidateResult("template");
+    currentTemplate.current = file;
     setTemplate(file);
     setErrors([]);
     setActive("template");
@@ -86,6 +93,7 @@ export default function App() {
 
   function changeJson(value: string) {
     invalidateResult("template");
+    currentJson.current = value;
     setJson(value);
   }
 
@@ -132,7 +140,7 @@ export default function App() {
     const controller = new AbortController();
     request.current = controller;
     setErrors([]);
-    setPending(true);
+    setPending("generate");
     try {
       const generated = await generateDocument(template, json, controller.signal);
       if (revision.current !== operation) return;
@@ -145,13 +153,46 @@ export default function App() {
     } finally {
       if (revision.current === operation) {
         request.current = undefined;
-        setPending(false);
+        setPending(undefined);
+      }
+    }
+  }
+
+  async function generateJson() {
+    if (pending || !template) return;
+    revision.current += 1;
+    request.current?.abort();
+    const operation = revision.current;
+    const source = template;
+    const controller = new AbortController();
+    request.current = controller;
+    setErrors([]);
+    setPending("analyze");
+    try {
+      const analysis = await analyzeTemplate(source, controller.signal);
+      if (revision.current !== operation || currentTemplate.current !== source) return;
+      const proposed = fieldsToSampleJson(analysis.fields);
+      const previous = currentJson.current;
+      if (proposed === previous) return;
+      if (previous.length > 0 && !window.confirm("Replace current JSON with generated example?")) return;
+      if (revision.current !== operation || currentTemplate.current !== source || currentJson.current !== previous) return;
+      changeJson(proposed);
+      setErrors([]);
+    } catch (error) {
+      if (revision.current !== operation || (error instanceof DOMException && error.name === "AbortError")) return;
+      setErrors(error instanceof AnalysisFailure ? error.diagnostics : diagnostic("Analysis failed", "The template could not be analyzed."));
+      setActive("errors");
+    } finally {
+      if (revision.current === operation) {
+        request.current = undefined;
+        setPending(undefined);
       }
     }
   }
 
   function clearTemplate() {
     invalidateResult("template");
+    currentTemplate.current = undefined;
     setTemplate(undefined);
     setErrors([]);
     setActive("template");
@@ -185,12 +226,12 @@ export default function App() {
             <Button onClick={() => fileInput.current?.click()}>Select</Button>
             <span className="filename">{template?.name ?? "No file selected"}</span>
             {template && <Button type="text" className="clear" aria-label="Remove template" onClick={clearTemplate}>×</Button>}
-            <Button type="primary" className="generate" loading={pending} disabled={pending} onClick={() => void generate()}>Generate <span aria-hidden="true">→</span></Button>
+            <Button type="primary" className="generate" aria-label="Generate document" loading={pending === "generate"} disabled={Boolean(pending)} onClick={() => void generate()}>Generate <span aria-hidden="true">→</span></Button>
             <input ref={fileInput} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={selected} />
           </div>
           <div className="editbar">
             <div className="mode" aria-label="Input mode"><Button disabled>Form</Button><Button className="active" aria-current="true">JSON</Button></div>
-            <div className="edit-actions"><Button size="small" onClick={() => void copyJson()}>{copyLabel}</Button><Button size="small" onClick={formatJson}>Format</Button></div>
+            <div className="edit-actions"><Button size="small" aria-label="Generate JSON" loading={pending === "analyze"} disabled={!template || Boolean(pending)} onClick={() => void generateJson()}>Generate JSON</Button><Button size="small" onClick={() => void copyJson()}>{copyLabel}</Button><Button size="small" onClick={formatJson}>Format</Button></div>
           </div>
           <MonacoJsonEditor value={json} onChange={changeJson} />
         </section>
@@ -203,7 +244,7 @@ export default function App() {
               <button className={active === "errors" ? "active" : ""} onClick={() => setActive("errors")}>Errors {errors.length > 0 && <span className="count">{errors.length}</span>}</button>
             </nav>
             <span className="spacer" />
-            {pending && <Spin size="small" aria-label="Generating document" />}
+            {pending && <Spin size="small" aria-label={pending === "analyze" ? "Analyzing template" : "Generating document"} />}
             <Button className="download" disabled={!result} onClick={download} icon={<DownloadIcon />}>Download</Button>
           </div>
           <div
