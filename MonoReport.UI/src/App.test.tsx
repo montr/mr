@@ -38,6 +38,7 @@ describe("MonoReport playground", () => {
     const repositoryLink = screen.getByRole("link", { name: "MonoReport" });
     expect(repositoryLink).toHaveAttribute("href", "https://github.com/montr/monoreport");
     expect(repositoryLink.querySelector("svg")).not.toBeNull();
+    expect(screen.getByText("dev")).toBeInTheDocument();
     const splitter = screen.getByRole("separator");
     fireEvent.keyDown(splitter, { key: "ArrowRight" });
     expect(splitter).toHaveAttribute("aria-valuenow", "48");

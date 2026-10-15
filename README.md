@@ -41,7 +41,7 @@ This illustration shows the workflow conceptually. For working templates, use th
 
 ## Browser UI
 
-The UI requires Node.js and npm in addition to the .NET SDK. Start `MonoReport.Api` at `http://127.0.0.1:5080` using the command in the HTTP API section. In another terminal, install the locked frontend dependencies and start the development server:
+The UI requires Node.js 22.12 or newer and npm in addition to the .NET SDK. Start `MonoReport.Api` at `http://127.0.0.1:5080` using the command in the HTTP API section. In another terminal, install the locked frontend dependencies and start the development server:
 
 ```bash
 cd MonoReport.UI
@@ -59,7 +59,39 @@ npm run typecheck
 npm run build
 ```
 
-The production command creates static assets under `MonoReport.UI/dist`. Feature 004 does not commit generated assets, package them into `MonoReport.Api`, add API static hosting or `UiEnabled`, or provide Docker packaging. Deploying the static bundle with the API is a separate integration step.
+The frontend production command creates static assets under `MonoReport.UI/dist`. Generated frontend and publish outputs are not committed.
+
+### Production hosting and containers
+
+A Release publish builds the locked frontend dependencies and serves the Playground, API, Swagger, and OpenAPI from one ASP.NET Core origin. Run the published application from its publish directory:
+
+```bash
+dotnet publish MonoReport.Api/MonoReport.Api.csproj -c Release -o artifacts/publish
+cd artifacts/publish
+ASPNETCORE_URLS=http://0.0.0.0:8080 dotnet MonoReport.Api.dll
+```
+
+Build and run the local production container from the repository root:
+
+```bash
+docker build -t monoreport:local .
+docker run --rm -p 8080:8080 monoreport:local
+```
+
+Compose uses the public GHCR image without building source. `MONOREPORT_TAG` selects an image version and `MONOREPORT_PORT` changes the host port; both default to `latest` and `8080` respectively. `MONOREPORT_IMAGE` can override the registry repository:
+
+```bash
+MONOREPORT_TAG=0.1.0 MONOREPORT_PORT=8081 docker compose up -d
+```
+
+Pulling and running a published image directly uses the same container contract:
+
+```bash
+docker pull ghcr.io/montr/monoreport:0.1.0
+docker run --rm -p 8080:8080 ghcr.io/montr/monoreport:0.1.0
+```
+
+Release tags are created manually and must follow `vMAJOR.MINOR.PATCH` or a SemVer prerelease such as `v0.1.0-rc.1`. Valid tags publish matching multi-platform GHCR images after quality and smoke checks. Stable tags also update `latest`; prerelease tags do not. The first published package must be made public manually before unauthenticated pulls can succeed.
 
 ### DOCX preview limitations
 

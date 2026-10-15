@@ -2,7 +2,7 @@ const path = require("path");
 const webpack = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const MonacoWebpackPlugin = require("monaco-editor-webpack-plugin");
-const packageMetadata = require("./package.json");
+const appVersion = process.env.MONOREPORT_VERSION || "dev";
 
 module.exports = {
   entry: "./src/index.tsx",
@@ -23,7 +23,7 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({ template: "./public/index.html" }),
     new MonacoWebpackPlugin({ languages: ["json"] }),
-    new webpack.DefinePlugin({ __APP_VERSION__: JSON.stringify(packageMetadata.version) })
+    new webpack.DefinePlugin({ __APP_VERSION__: JSON.stringify(appVersion) })
   ],
   devServer: {
     port: 3000,

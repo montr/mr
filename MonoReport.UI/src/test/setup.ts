@@ -18,4 +18,4 @@ Object.defineProperty(window, "matchMedia", {
 Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn() }, configurable: true });
 Object.defineProperty(URL, "createObjectURL", { value: vi.fn(() => "blob:test"), configurable: true });
 Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
-vi.stubGlobal("__APP_VERSION__", "0.0.1");
+vi.stubGlobal("__APP_VERSION__", "dev");

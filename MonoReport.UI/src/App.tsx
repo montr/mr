@@ -216,7 +216,7 @@ export default function App() {
         </section>
       </main>
       <footer>
-        <span className="project-links"><a href={repositoryUrl} target="_blank" rel="noreferrer" title="MonoReport on GitHub"><GitHubIcon />MonoReport</a><a href={`${repositoryUrl}/releases/tag/v${__APP_VERSION__}`} target="_blank" rel="noreferrer">v{__APP_VERSION__}</a></span>
+        <span className="project-links"><a href={repositoryUrl} target="_blank" rel="noreferrer" title="MonoReport on GitHub"><GitHubIcon />MonoReport</a>{__APP_VERSION__ === "dev" ? <span>dev</span> : <a href={`${repositoryUrl}/releases/tag/v${__APP_VERSION__}`} target="_blank" rel="noreferrer">v{__APP_VERSION__}</a>}</span>
         <a href="/docs/" title="API documentation"><DocumentationIcon />API docs</a>
       </footer>
     </div>

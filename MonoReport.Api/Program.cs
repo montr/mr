@@ -44,6 +44,8 @@ app.Use(async (context, next) =>
         if (!context.Response.HasStarted) await problems.Create(context, 500, "server.internal_error").ExecuteAsync(context);
     }
 });
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.MapPost("/api/documents/generate", (HttpContext context, DocumentEndpoints endpoints) => endpoints.Generate(context))
     .WithName("GenerateDocument").Produces(200, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     .ProducesProblem(400).ProducesProblem(413).ProducesProblem(415).ProducesProblem(422).ProducesProblem(500);
@@ -61,6 +63,31 @@ if (builder.Configuration.GetValue<bool?>("MonoReport:DocumentationEnabled") ?? 
         options.DocumentTitle = "MonoReport API";
     });
 }
+app.MapFallback(async context =>
+{
+    var path = context.Request.Path.Value ?? string.Empty;
+    var reserved = path.Equals("/api", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/docs", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/docs/", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/openapi", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/openapi/", StringComparison.OrdinalIgnoreCase);
+    if (reserved || Path.HasExtension(path))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    var index = Path.Combine(app.Environment.WebRootPath ?? string.Empty, "index.html");
+    if (!File.Exists(index))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    context.Response.ContentType = "text/html; charset=utf-8";
+    await context.Response.SendFileAsync(index);
+});
 app.Run();
 
 public partial class Program;

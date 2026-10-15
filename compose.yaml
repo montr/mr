@@ -1,0 +1,6 @@
+services:
+  monoreport:
+    image: "${MONOREPORT_IMAGE:-ghcr.io/montr/monoreport}:${MONOREPORT_TAG:-latest}"
+    ports:
+      - "${MONOREPORT_PORT:-8080}:8080"
+    restart: unless-stopped
