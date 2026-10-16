@@ -3,7 +3,7 @@
 
 Future capabilities identified during the initial MonoReport specification and subsequent development.
 
-The product architecture principles below record approved product direction. Planned capabilities are not approved Feature Specs; their detailed scope, priority, and implementation require Product Owner approval through the Feature Workflow.
+The product architecture principles below record approved product direction. Planned capabilities are not approved Feature Specs; their detailed scope, priority, and implementation require Product Owner approval through the Development Workflow.
 
 ## Product Architecture — Multiple Document Formats
 
@@ -100,7 +100,7 @@ This is exploratory and is not part of the currently approved engine scope.
 
 1. Do not assign feature IDs to backlog items.
 2. Do not treat backlog items as approved requirements.
-3. When the Product Owner selects an item for implementation, create the next sequential Feature directory and start the standard workflow.
+3. When the Product Owner selects an item for implementation, create the next sequential Feature directory and follow the Development Workflow in AGENTS.md.
 4. Preserve the original backlog entry or link it to the resulting Feature.
 5. Add newly identified future capabilities here only with Product Owner approval.
 

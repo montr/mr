@@ -1,14 +1,18 @@
 # Project Rules
 
-## Feature Workflow
+## Development Workflow
 
-1. Follow `.agents/skills/feature-orchestrator/SKILL.md` for feature development, including independent Architect, Developer, and Reviewer roles. Do not substitute Developer self-review for independent review.
-2. Require explicit Product Owner approval of the complete Feature Spec before planning, of the independently reviewed Implementation Plan before implementation, and of the result before completion. On the first `CHANGES REQUESTED`, stop and await Product Owner decisions; do not automatically fix or re-review findings.
-3. Keep feature artifacts under `.docs/features/<NNN>-<slug>/` with sequential, never-reused IDs. `feature-status.json` contains only `phase`; the Orchestrator owns transitions. Record approvals and verification evidence in the feature documents and reconcile persisted state with Git and files when resuming.
-4. Material changes to requirements, architecture, scope, workflow, or approval gates require explicit Product Owner approval. Shortened workflows for minor work also require approval and must retain relevant tests.
-5. Do not change controlling Skills without explicit Product Owner permission. Follow the Git Operations rules below.
-6. Maintain `.docs/features/backlog.md`: propose deferred requirements for Product Owner approval; do not silently discard them or create a Feature directory until selected.
-7. Historical Feature 001: preserve the original specification as `.docs/features/001-initial-implementation/feature-spec.md`, version `0.0.1`, initially in `review`. Do not invent past approvals or a retrospective plan. Audit or correct it only with explicit authorization.
+1. Classify work by its actual scope and risk. Explicit Product Owner workflow decisions take precedence and must be recorded in the relevant Feature document when one exists.
+2. **Maintenance** covers bounded bug fixes, refactoring, documentation, and technical improvements that do not introduce a new product capability or materially change an approved public contract, architecture, or scope. One agent may implement Maintenance directly. A Feature Spec, Implementation Plan, Feature directory, Orchestrator, and independent review are not required. The agent may keep a brief working plan when useful, without a separate approval gate.
+3. **Feature** covers a new user-facing or programmatic capability. Keep Feature artifacts under `.docs/features/<NNN>-<slug>/` with sequential, never-reused IDs. One agent prepares the complete Feature Spec and a concise Implementation Plan by default. Obtain explicit Product Owner approval before implementation and explicit Product Owner acceptance before completion. Independent Architect, Developer, Reviewer, and Orchestrator roles are optional rather than default gates.
+4. **High-risk** is a modifier for Maintenance or Feature work involving substantial architecture, security or permissions, persistence or migration, concurrency, irreversible operations, public contracts, release workflows, binary or document integrity, or broad cross-component impact. Identifying high risk does not by itself require stopping: report the risk and propose proportionate additional checks. Obtain explicit Product Owner approval before materially changing approved requirements, architecture, scope, workflow gates, or when additional authority is required. Use independent review or subagents only when needed and agreed with the Product Owner.
+5. For every route, preserve relevant quality checks and meaningful behavior-focused tests, disclose failed or unexecuted checks, update affected documentation, and protect existing user changes. A testable bug fix should normally include a regression test. Do not weaken verification merely because the workflow is lighter.
+6. `.agents/skills/feature-orchestrator/SKILL.md` is an optional coordination tool for an explicitly selected complex or high-risk workflow. When it is used, its approved roles, gates, state transitions, and stop conditions apply. Otherwise, the handling agent owns the agreed workflow and records required approvals and verification evidence.
+7. When an independent review is part of the agreed workflow, the first `CHANGES REQUESTED` result stops automatic correction and re-review. Record the findings and await Product Owner direction. Do not silently convert unresolved blocking findings into `PASS`.
+8. `feature-status.json`, when used, contains only `phase`. Reconcile persisted state with Git, Feature documents, and implementation when resuming. Do not invent approvals, verification, or completion.
+9. Do not change controlling Skills without explicit Product Owner permission. Follow the Git Operations rules below.
+10. Maintain `.docs/features/backlog.md`: propose deferred requirements for Product Owner approval; do not silently discard them or create a Feature directory until selected.
+11. Historical Feature 001: preserve the original specification as `.docs/features/001-initial-implementation/feature-spec.md`, version `0.0.1`, initially in `review`. Do not invent past approvals or a retrospective plan. Audit or correct it only with explicit authorization.
 
 ## Git Operations
 

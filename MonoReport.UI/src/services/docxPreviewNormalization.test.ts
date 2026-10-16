@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { normalizeDocxForPreview } from "./docxPreviewNormalization";
 
 const transitional = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -60,6 +60,23 @@ describe("DOCX preview normalization", () => {
     expect(xml).not.toContain("MERGEFIELD Empty");
     expect(xml).toContain("MERGEFIELD Nested");
     expect(xml).toContain("Nested cached value");
+  });
+
+  it("removes one leading UTF-8 BOM before parsing a story", async () => {
+    const xml = story(transitional, `<w:p><w:fldSimple w:instr=" MERGEFIELD Name "><w:r><w:t>«Name»</w:t></w:r></w:fldSimple></w:p>`);
+    const encoded = new TextEncoder().encode(xml);
+    const bomEncoded = new Uint8Array(encoded.length + 3);
+    bomEncoded.set([0xef, 0xbb, 0xbf]);
+    bomEncoded.set(encoded, 3);
+    const zip = new JSZip();
+    zip.file("word/document.xml", bomEncoded);
+    const source = new Blob([await zip.generateAsync({ type: "arraybuffer" })]);
+    const parseFromString = vi.spyOn(DOMParser.prototype, "parseFromString");
+
+    const normalized = await JSZip.loadAsync(await (await normalizeDocxForPreview(source)).arrayBuffer());
+
+    expect(parseFromString).toHaveBeenCalledWith(xml, "application/xml");
+    expect(await normalized.file("word/document.xml")!.async("string")).not.toContain("fldSimple");
   });
 
   it("rejects malformed packages and malformed supported XML", async () => {

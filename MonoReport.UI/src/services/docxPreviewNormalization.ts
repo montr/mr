@@ -10,7 +10,8 @@ function parseStory(xml: string): XMLDocument {
   if (typeof DOMParser === "undefined" || typeof XMLSerializer === "undefined" || /<!DOCTYPE/i.test(xml)) {
     throw new Error("Unsupported preview XML");
   }
-  const document = new DOMParser().parseFromString(xml, "application/xml");
+  const parseableXml = xml.startsWith("\uFEFF") ? xml.slice(1) : xml;
+  const document = new DOMParser().parseFromString(parseableXml, "application/xml");
   if (document.getElementsByTagName("parsererror").length > 0) throw new Error("Malformed preview XML");
   return document;
 }

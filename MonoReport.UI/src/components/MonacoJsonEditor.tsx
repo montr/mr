@@ -8,31 +8,39 @@ interface Props {
 
 export function MonacoJsonEditor({ value, onChange }: Props) {
   const host = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const change = useRef(onChange);
   change.current = onChange;
 
   useEffect(() => {
     if (!host.current) return;
+    const model = monaco.editor.createModel(value, "json");
+    model.updateOptions({ tabSize: 2, insertSpaces: true });
+    model.detectIndentation(true, 2);
     const editor = monaco.editor.create(host.current, {
-      value,
-      language: "json",
+      model,
       theme: "vs",
       automaticLayout: true,
       minimap: { enabled: true },
+      glyphMargin: false,
       scrollBeyondLastLine: false,
       fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace",
       fontSize: 12,
-      ariaLabel: "JSON data"
+      ariaLabel: "JSON data",
+      pasteAs: { enabled: false }
     });
+    editorRef.current = editor;
     const subscription = editor.onDidChangeModelContent(() => change.current(editor.getValue()));
     return () => {
+      editorRef.current = null;
       subscription.dispose();
       editor.dispose();
+      model.dispose();
     };
   }, []);
 
   useEffect(() => {
-    const editor = monaco.editor.getEditors().find(candidate => candidate.getDomNode()?.parentElement === host.current);
+    const editor = editorRef.current;
     if (editor && editor.getValue() !== value) editor.setValue(value);
   }, [value]);
 
