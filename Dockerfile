@@ -5,6 +5,7 @@ WORKDIR /src/MonoReport.UI
 COPY MonoReport.UI/package.json MonoReport.UI/package-lock.json ./
 RUN npm ci
 COPY MonoReport.UI/ ./
+COPY Samples/ /src/Samples/
 ARG APP_VERSION=dev
 RUN MONOREPORT_VERSION="$APP_VERSION" npm run build
 
@@ -25,8 +26,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 ARG SOURCE_URL=https://github.com/montr/monoreport
 ARG APP_VERSION=dev
 LABEL org.opencontainers.image.source="$SOURCE_URL" \
-      org.opencontainers.image.version="$APP_VERSION" \
-      org.opencontainers.image.title="MonoReport"
+    org.opencontainers.image.version="$APP_VERSION" \
+    org.opencontainers.image.title="MonoReport"
 WORKDIR /app
 COPY --from=api-build --chown=$APP_UID:$APP_UID /app/publish ./
 ENV ASPNETCORE_HTTP_PORTS=8080 \
