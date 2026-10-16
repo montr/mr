@@ -19,7 +19,7 @@ The product architecture principles below record approved product direction. Pla
 
 ### Playground Examples
 
-Status: Backlog. Proposed as a small Feature after Feature 004; implementation is not approved.
+Status: Completed as Feature 009 and accepted by the Product Owner on 2026-10-16. Scope and acceptance evidence are governed by `.docs/features/009-playground-examples/feature-spec.md` and `.docs/features/009-playground-examples/review.md`.
 
 1. Provide a static JSON manifest describing demo examples by ID, title, document format, template path, and sample data path, with an explicit default example.
 2. On opening MonoReport Playground, automatically load the default example template and JSON, and show its template preview. Generate a result only when the user clicks Generate.

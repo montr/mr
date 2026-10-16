@@ -1,0 +1,12 @@
+{
+  "defaultExample": "construction-cost-estimate",
+  "examples": [
+    {
+      "id": "construction-cost-estimate",
+      "title": "Construction cost estimate",
+      "format": "docx",
+      "templatePath": "/examples/sample.template.docx",
+      "dataPath": "/examples/sample.json"
+    }
+  ]
+}

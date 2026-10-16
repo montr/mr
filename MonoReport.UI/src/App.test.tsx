@@ -17,6 +17,11 @@ vi.mock("./components/DocxPreview", () => ({
 
 const mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const template = () => new File([new Uint8Array([80, 75, 3, 4])], "sample.template.docx", { type: mime });
+const manifest = {
+  defaultExample: "construction-cost-estimate",
+  examples: [{ id: "construction-cost-estimate", title: "Construction cost estimate", format: "docx", templatePath: "/examples/sample.template.docx", dataPath: "/examples/sample.json" }]
+};
+const sampleData = '{"Project":{"Name":"Riverside"}}';
 const success = (bytes = new Uint8Array([80, 75, 7, 8])) => {
   const blob = new Blob([bytes], { type: mime });
   return { ok: true, status: 200, blob: async () => blob, headers: new Headers({ "Content-Type": mime, "Content-Disposition": "attachment; filename=generated.docx" }) } as Response;
@@ -24,20 +29,34 @@ const success = (bytes = new Uint8Array([80, 75, 7, 8])) => {
 const analysis = (fields: unknown[] = [{ name: "Company.Name", type: "string", formats: [[]] }], valid = true) =>
   new Response(JSON.stringify({ valid, errors: valid ? [] : [{ code: "template.invalid_region", message: "Invalid region" }], warnings: [], fields }), { status: 200, headers: { "Content-Type": "application/json" } });
 
+function mockPlaygroundFetch(api: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> = async () => { throw new Error("Unexpected API request"); }) {
+  const apiMock = vi.fn(api);
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url === "/examples.json") return Promise.resolve(new Response(JSON.stringify(manifest), { status: 200, headers: { "Content-Type": "application/json" } }));
+    if (url === "/examples/sample.template.docx") return Promise.resolve(new Response(new Uint8Array([80, 75, 3, 4]), { status: 200, headers: { "Content-Type": mime } }));
+    if (url === "/examples/sample.json") return Promise.resolve(new Response(sampleData, { status: 200, headers: { "Content-Type": "application/json" } }));
+    return apiMock(input, init);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return { apiMock, fetchMock };
+}
+
 async function selectTemplate(user: ReturnType<typeof userEvent.setup>, file = template()) {
-  await user.upload(screen.getByLabelText("Template and input data").querySelector("input[type=file]") as HTMLInputElement, file);
+  await user.upload(screen.getByLabelText("Template actions").querySelector("input[type=file]") as HTMLInputElement, file);
 }
 
 describe("MonoReport playground", () => {
-  beforeEach(() => { previewSources.length = 0; vi.stubGlobal("fetch", vi.fn()); });
+  beforeEach(() => { previewSources.length = 0; mockPlaygroundFetch(); });
 
-  it("starts with the approved controls, empty template, JSON document, and accessible splitter", () => {
+  it("loads the default example without generation and keeps the approved controls and accessible splitter", async () => {
     render(<App />);
-    expect(screen.getByText("Select a template")).toBeInTheDocument();
+    expect(await screen.findByText("Template preview")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Form" })).toBeDisabled();
-    expect(screen.getByLabelText("JSON data")).toHaveValue("{}");
-    expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Generate JSON" })).toBeDisabled();
+    expect(screen.getByLabelText("JSON data")).toHaveValue(sampleData);
+    expect(screen.getByRole("combobox", { name: "Examples" })).toHaveValue("construction-cost-estimate");
+    expect(screen.getByRole("button", { name: "Download template" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Generate JSON" })).toBeEnabled();
     const repositoryLink = screen.getByRole("link", { name: "MonoReport" });
     expect(repositoryLink).toHaveAttribute("href", "https://github.com/montr/monoreport");
     expect(repositoryLink.querySelector("svg")).not.toBeNull();
@@ -49,6 +68,7 @@ describe("MonoReport playground", () => {
 
   it("formats and copies valid JSON while invalid JSON remains unchanged and never requests", async () => {
     const user = userEvent.setup();
+    const { apiMock } = mockPlaygroundFetch();
     render(<App />);
     const editor = screen.getByLabelText("JSON data");
     const clipboard = vi.spyOn(navigator.clipboard, "writeText");
@@ -62,12 +82,12 @@ describe("MonoReport playground", () => {
     expect(editor).toHaveValue("{");
     expect(screen.getByText("Invalid JSON")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Generate document" }));
-    expect(fetch).not.toHaveBeenCalled();
+    expect(apiMock).not.toHaveBeenCalled();
   });
 
   it("uses picker and drop through one replacement path, preserves JSON, and rejects unsupported files without replacement", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(success()));
+    mockPlaygroundFetch(async () => success());
     render(<App />);
     const editor = screen.getByLabelText("JSON data");
     fireEvent.change(editor, { target: { value: '{"kept":true}' } });
@@ -83,11 +103,13 @@ describe("MonoReport playground", () => {
     fireEvent.drop(screen.getByLabelText("Preview").querySelector(".canvas")!, { dataTransfer: { files: [new File([new Uint8Array([1])], "bad.pdf")], types: ["Files"] } });
     expect(screen.getByText("Unsupported template format")).toBeInTheDocument();
     expect(screen.getByText("second.docx")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Download/ })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /Download/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Result" }));
+    expect(screen.getByRole("button", { name: "Download result" })).toBeEnabled();
     const third = new File([new Uint8Array([2])], "third.docx", { type: mime });
     fireEvent.drop(screen.getByLabelText("Preview").querySelector(".canvas")!, { dataTransfer: { files: [third], types: ["Files"] } });
     expect(screen.getByText("third.docx")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Download result" })).not.toBeInTheDocument();
     expect(editor).toHaveValue('{"kept":true}');
   });
 
@@ -95,16 +117,15 @@ describe("MonoReport playground", () => {
     const user = userEvent.setup();
     let resolve!: (response: Response) => void;
     const responseBlob = new Blob([new Uint8Array([80, 75, 7, 8])], { type: mime });
-    const fetchMock = vi.fn(() => new Promise<Response>(done => { resolve = done; }));
-    vi.stubGlobal("fetch", fetchMock);
+    const { apiMock } = mockPlaygroundFetch(() => new Promise<Response>(done => { resolve = done; }));
     render(<App />);
     await selectTemplate(user);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(apiMock).not.toHaveBeenCalled();
     const generate = screen.getByRole("button", { name: "Generate document" });
     await user.click(generate);
     expect(generate).toBeDisabled();
     await user.click(generate);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(apiMock).toHaveBeenCalledTimes(1);
     resolve({ ok: true, status: 200, blob: async () => responseBlob, headers: new Headers({ "Content-Type": mime, "Content-Disposition": "attachment; filename=generated.docx" }) } as Response);
     await screen.findByText("Result preview");
     expect(previewSources.at(-1)).toBe(responseBlob);
@@ -118,7 +139,7 @@ describe("MonoReport playground", () => {
 
   it("renders real API diagnostics and multiple issues without mock content", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ errors: [{ code: "first", message: "First issue", dataPath: "Items[3].Amount", location: "/word/document.xml, paragraph 2" }, { code: "second", detail: "Second issue" }] }), { status: 422, headers: { "Content-Type": "application/problem+json" } })));
+    mockPlaygroundFetch(async () => new Response(JSON.stringify({ errors: [{ code: "first", message: "First issue", dataPath: "Items[3].Amount", location: "/word/document.xml, paragraph 2" }, { code: "second", detail: "Second issue" }] }), { status: 422, headers: { "Content-Type": "application/problem+json" } }));
     render(<App />);
     await selectTemplate(user);
     await user.click(screen.getByRole("button", { name: "Generate document" }));
@@ -131,45 +152,45 @@ describe("MonoReport playground", () => {
 
   it("invalidates a successful result on JSON or template change and after failure", async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn().mockResolvedValueOnce(success()).mockResolvedValueOnce(new Response(JSON.stringify({ title: "Failed", detail: "Incompatible", code: "generation.invalid_data" }), { status: 422, headers: { "Content-Type": "application/problem+json" } }));
-    vi.stubGlobal("fetch", fetchMock);
+    const responses = [success(), new Response(JSON.stringify({ title: "Failed", detail: "Incompatible", code: "generation.invalid_data" }), { status: 422, headers: { "Content-Type": "application/problem+json" } })];
+    mockPlaygroundFetch(async () => responses.shift()!);
     render(<App />);
     await selectTemplate(user);
     await user.click(screen.getByRole("button", { name: "Generate document" }));
     await screen.findByText("Result preview");
     expect(screen.getByRole("button", { name: /Download/ })).toBeEnabled();
     await user.type(screen.getByLabelText("JSON data"), " ");
-    expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Download result" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Result" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Generate document" }));
     expect(await screen.findByText(/generation.invalid_data/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Download result" })).not.toBeInTheDocument();
   });
 
   it("ignores an obsolete success after JSON changes during generation", async () => {
     const user = userEvent.setup();
     let resolve!: (response: Response) => void;
-    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(done => { resolve = done; })));
+    mockPlaygroundFetch(() => new Promise<Response>(done => { resolve = done; }));
     render(<App />);
     await selectTemplate(user);
     await user.click(screen.getByRole("button", { name: "Generate document" }));
     await user.type(screen.getByLabelText("JSON data"), " ");
     resolve(success());
     await waitFor(() => expect(screen.getByRole("button", { name: "Result" })).toBeDisabled());
-    expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Download result" })).not.toBeInTheDocument();
   });
 
   it("analyzes only on explicit action, confirms replacement, and invalidates an existing Result", async () => {
     const user = userEvent.setup();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
-    const fetchMock = vi.fn().mockResolvedValueOnce(success()).mockResolvedValueOnce(analysis([
+    const responses = [success(), analysis([
       { name: "Company.Name", type: "string", formats: [[{ kind: "general", value: "Upper" }]] },
       { name: "Orders", type: "array", formats: [], fields: [{ name: "Number", type: "string", formats: [[]] }] }
-    ]));
-    vi.stubGlobal("fetch", fetchMock);
+    ])];
+    const { apiMock } = mockPlaygroundFetch(async () => responses.shift()!);
     render(<App />);
     await selectTemplate(user);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(apiMock).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Generate document" }));
     await screen.findByText("Result preview");
 
@@ -178,14 +199,14 @@ describe("MonoReport playground", () => {
     await waitFor(() => expect(screen.getByLabelText("JSON data")).toHaveValue(JSON.stringify({ Company: { Name: "" }, Orders: [{ Number: "" }] }, null, 2)));
     expect(confirm).toHaveBeenCalledWith("Replace current JSON with generated example?");
     expect(screen.getByRole("button", { name: "Result" })).toBeDisabled();
-    const [, analysisInit] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect((analysisInit.body as FormData).get("template")).toBe(previewSources[0]);
+    const [, analysisInit] = apiMock.mock.calls[1] as [string, RequestInit];
+    expect(((analysisInit.body as FormData).get("template") as File).name).toBe("sample.template.docx");
   });
 
   it("does not confirm for empty JSON and leaves nonempty JSON unchanged when replacement is cancelled", async () => {
     const user = userEvent.setup();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(analysis())));
+    mockPlaygroundFetch(async () => analysis());
     render(<App />);
     await selectTemplate(user);
     const editor = screen.getByLabelText("JSON data");
@@ -203,7 +224,7 @@ describe("MonoReport playground", () => {
   it("never applies stale analysis after JSON or template changes", async () => {
     const user = userEvent.setup();
     const resolvers: Array<(response: Response) => void> = [];
-    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => resolvers.push(resolve))));
+    mockPlaygroundFetch(() => new Promise<Response>(resolve => resolvers.push(resolve)));
     render(<App />);
     await selectTemplate(user);
     const editor = screen.getByLabelText("JSON data");
@@ -222,11 +243,148 @@ describe("MonoReport playground", () => {
 
   it("shows analysis failures without replacing JSON", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(analysis([], false)));
+    mockPlaygroundFetch(async () => analysis([], false));
     render(<App />);
     await selectTemplate(user);
     await user.click(screen.getByRole("button", { name: "Generate JSON" }));
     expect(await screen.findByText("template.invalid_region", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByLabelText("JSON data")).toHaveValue(sampleData);
+  });
+
+  it("applies example assets atomically and ignores them after JSON editing during the load", async () => {
+    let resolveTemplate!: (response: Response) => void;
+    let resolveData!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/examples.json") return Promise.resolve(new Response(JSON.stringify(manifest), { status: 200 }));
+      if (url.endsWith(".docx")) return new Promise<Response>(resolve => { resolveTemplate = resolve; });
+      return new Promise<Response>(resolve => { resolveData = resolve; });
+    }));
+    render(<App />);
+    await waitFor(() => expect(resolveTemplate).toBeTypeOf("function"));
+    fireEvent.change(screen.getByLabelText("JSON data"), { target: { value: "user edit" } });
+    resolveTemplate(new Response(new Uint8Array([80, 75]), { status: 200, headers: { "Content-Type": mime } }));
+    resolveData(new Response('{"stale":true}', { status: 200 }));
+    await waitFor(() => expect(screen.getByLabelText("JSON data")).toHaveValue("user edit"));
+    expect(screen.getByText("No file selected")).toBeInTheDocument();
+  });
+
+  it("ignores a pending example after a custom upload", async () => {
+    let resolveTemplate!: (response: Response) => void;
+    let resolveData!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/examples.json") return Promise.resolve(new Response(JSON.stringify(manifest), { status: 200 }));
+      if (url.endsWith(".docx")) return new Promise<Response>(resolve => { resolveTemplate = resolve; });
+      return new Promise<Response>(resolve => { resolveData = resolve; });
+    }));
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(resolveTemplate).toBeTypeOf("function"));
+    await selectTemplate(user, new File([new Uint8Array([9])], "custom.docx", { type: mime }));
+    resolveTemplate(new Response(new Uint8Array([80, 75]), { status: 200, headers: { "Content-Type": mime } }));
+    resolveData(new Response('{"stale":true}', { status: 200 }));
+    await waitFor(() => expect(screen.getByText("custom.docx")).toBeInTheDocument());
+    expect(screen.getByRole("combobox", { name: "Examples" })).toHaveValue("custom");
     expect(screen.getByLabelText("JSON data")).toHaveValue("{}");
+  });
+
+  it("marks edits, preserves Custom JSON, confirms restoration, and downloads exact template bytes", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm");
+    render(<App />);
+    await screen.findByText("Template preview");
+    fireEvent.change(screen.getByLabelText("JSON data"), { target: { value: "byte-for-byte JSON" } });
+    expect(screen.getByLabelText("Example modified")).toBeInTheDocument();
+    const custom = new File([new Uint8Array([4, 5, 6])], "custom.docx", { type: mime });
+    await selectTemplate(user, custom);
+    expect(screen.getByLabelText("JSON data")).toHaveValue("byte-for-byte JSON");
+    expect(screen.getByRole("combobox", { name: "Examples" })).toHaveValue("custom");
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    await user.click(screen.getByRole("button", { name: "Download template" }));
+    expect(URL.createObjectURL).toHaveBeenCalledWith(custom);
+    expect(click).toHaveBeenCalled();
+    confirm.mockReturnValueOnce(false);
+    fireEvent.change(screen.getByRole("combobox", { name: "Examples" }), { target: { value: "construction-cost-estimate" } });
+    expect(screen.getByRole("combobox", { name: "Examples" })).toHaveValue("custom");
+    expect(screen.getByLabelText("JSON data")).toHaveValue("byte-for-byte JSON");
+    confirm.mockReturnValueOnce(true);
+    fireEvent.change(screen.getByRole("combobox", { name: "Examples" }), { target: { value: "construction-cost-estimate" } });
+    await waitFor(() => expect(screen.getByLabelText("JSON data")).toHaveValue(sampleData));
+  });
+
+  it("prevents a Generate response from applying after an example commits", async () => {
+    let templateLoads = 0;
+    let dataLoads = 0;
+    let resolveTemplate!: (response: Response) => void;
+    let resolveData!: (response: Response) => void;
+    let resolveGenerate!: (response: Response) => void;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/examples.json") return Promise.resolve(new Response(JSON.stringify(manifest), { status: 200 }));
+      if (url.endsWith(".docx")) {
+        templateLoads += 1;
+        return templateLoads === 1 ? Promise.resolve(new Response(new Uint8Array([80, 75]), { status: 200, headers: { "Content-Type": mime } })) : new Promise<Response>(resolve => { resolveTemplate = resolve; });
+      }
+      if (url.endsWith(".json")) {
+        dataLoads += 1;
+        return dataLoads === 1 ? Promise.resolve(new Response(sampleData, { status: 200 })) : new Promise<Response>(resolve => { resolveData = resolve; });
+      }
+      return new Promise<Response>(resolve => { resolveGenerate = resolve; });
+    }));
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("Template preview");
+    await selectTemplate(user, new File([new Uint8Array([9])], "custom.docx", { type: mime }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Examples" }), { target: { value: "construction-cost-estimate" } });
+    await waitFor(() => expect(resolveTemplate).toBeTypeOf("function"));
+    await user.click(screen.getByRole("button", { name: "Generate document" }));
+    resolveTemplate(new Response(new Uint8Array([80, 75]), { status: 200, headers: { "Content-Type": mime } }));
+    resolveData(new Response(sampleData, { status: 200 }));
+    await waitFor(() => expect(screen.getByText("sample.template.docx")).toBeInTheDocument());
+    resolveGenerate(success());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Result" })).toBeDisabled());
+  });
+
+  it("does not apply an older example after a rapid selection returns to the current example", async () => {
+    const twoExamples = {
+      ...manifest,
+      examples: [...manifest.examples, { id: "second", title: "Second", format: "docx", templatePath: "/examples/second.template.docx", dataPath: "/examples/second.json" }]
+    };
+    let resolveTemplate!: (response: Response) => void;
+    let resolveData!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/examples.json") return Promise.resolve(new Response(JSON.stringify(twoExamples), { status: 200 }));
+      if (url === "/examples/sample.template.docx") return Promise.resolve(new Response(new Uint8Array([80, 75]), { status: 200, headers: { "Content-Type": mime } }));
+      if (url === "/examples/sample.json") return Promise.resolve(new Response(sampleData, { status: 200 }));
+      if (url.endsWith("second.template.docx")) return new Promise<Response>(resolve => { resolveTemplate = resolve; });
+      return new Promise<Response>(resolve => { resolveData = resolve; });
+    }));
+    render(<App />);
+    await screen.findByText("Template preview");
+    const selector = screen.getByRole("combobox", { name: "Examples" });
+    fireEvent.change(selector, { target: { value: "second" } });
+    await waitFor(() => expect(resolveTemplate).toBeTypeOf("function"));
+    fireEvent.change(selector, { target: { value: "construction-cost-estimate" } });
+    resolveTemplate(new Response(new Uint8Array([1, 2]), { status: 200, headers: { "Content-Type": mime } }));
+    resolveData(new Response('{"second":true}', { status: 200 }));
+    await waitFor(() => expect(selector).toHaveValue("construction-cost-estimate"));
+    expect(screen.getByLabelText("JSON data")).toHaveValue(sampleData);
+    expect(screen.getByText("sample.template.docx")).toBeInTheDocument();
+  });
+
+  it("shows an active malformed example failure without partially replacing content", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/examples.json") return Promise.resolve(new Response(JSON.stringify(manifest), { status: 200 }));
+      if (url.endsWith(".docx")) return Promise.resolve(new Response(new Uint8Array([80, 75]), { status: 200, headers: { "Content-Type": mime } }));
+      return Promise.resolve(new Response("{", { status: 200 }));
+    }));
+    render(<App />);
+    expect(await screen.findByText("Example could not be loaded")).toBeInTheDocument();
+    expect(screen.getByLabelText("JSON data")).toHaveValue("{}");
+    expect(screen.getByText("No file selected")).toBeInTheDocument();
   });
 });

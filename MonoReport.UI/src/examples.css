@@ -1,0 +1,67 @@
+.document-toolbar {
+  min-height: 52px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 15px;
+  border-bottom: 1px solid #e7eaf0;
+  background: #fff;
+}
+
+.examples-control,
+.document-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.examples-control label {
+  font-size: 12px;
+  color: #68727e;
+}
+
+.examples-control select {
+  max-width: 230px;
+  min-width: 175px;
+  height: 32px;
+  border: 1px solid #d7dce2;
+  border-radius: 6px;
+  padding: 0 28px 0 9px;
+  background: #fff;
+  color: #303844;
+}
+
+.modified {
+  font-size: 11px;
+  color: #9b6518;
+}
+
+.document-actions {
+  margin-left: auto;
+}
+
+.document-actions input[type="file"] {
+  display: none;
+}
+
+.result-toolbar {
+  justify-content: flex-end;
+}
+
+@media (max-width: 850px) {
+  .document-toolbar { padding-inline: 10px; }
+  .examples-control select { min-width: 120px; max-width: 180px; }
+}
+
+@media (max-width: 560px) {
+  .document-toolbar { gap: 6px; padding-inline: 6px; }
+  .examples-control { gap: 5px; }
+  .examples-control label,
+  .modified { display: none; }
+  .examples-control select { min-width: 100px; max-width: 130px; }
+  .document-actions { gap: 5px; }
+  .document-actions .ant-btn { padding-inline: 8px; }
+}

@@ -9,13 +9,48 @@ import { fieldsToSampleJson } from "./services/sampleJson";
 import type { Diagnostic, GeneratedDocument } from "./types";
 import "./styles.css";
 import "./mobile.css";
+import "./examples.css";
 
 type Tab = "template" | "result" | "errors";
 type Operation = "generate" | "analyze";
+type ExampleSelection = string | "custom";
+
+interface ExampleDefinition {
+  id: string;
+  title: string;
+  format: "docx";
+  templatePath: string;
+  dataPath: string;
+}
+
+interface ExampleManifest {
+  defaultExample: string;
+  examples: ExampleDefinition[];
+}
+
 const repositoryUrl = "https://github.com/montr/monoreport";
+const docxMime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 function diagnostic(title: string, detail: string): Diagnostic[] {
   return [{ title, detail }];
+}
+
+function validateManifest(value: unknown): ExampleManifest {
+  if (!value || typeof value !== "object") throw new Error("The examples registry is invalid.");
+  const candidate = value as Partial<ExampleManifest>;
+  if (typeof candidate.defaultExample !== "string" || !Array.isArray(candidate.examples) || candidate.examples.length === 0) throw new Error("The examples registry is invalid.");
+  const ids = new Set<string>();
+  for (const example of candidate.examples) {
+    if (!example || typeof example.id !== "string" || !example.id || ids.has(example.id) || typeof example.title !== "string" || !example.title || example.format !== "docx" || typeof example.templatePath !== "string" || !example.templatePath || typeof example.dataPath !== "string" || !example.dataPath) throw new Error("The examples registry is invalid.");
+    ids.add(example.id);
+  }
+  if (!ids.has(candidate.defaultExample)) throw new Error("The default example is missing from the registry.");
+  return candidate as ExampleManifest;
+}
+
+function filenameFromPath(path: string) {
+  const segment = path.split("/").filter(Boolean).at(-1) ?? "template.docx";
+  try { return decodeURIComponent(segment); } catch { return segment; }
 }
 
 function DownloadIcon() {
@@ -43,26 +78,105 @@ export default function App() {
   const [pending, setPending] = useState<Operation>();
   const [copyLabel, setCopyLabel] = useState("Copy");
   const [dragging, setDragging] = useState(false);
+  const [examples, setExamples] = useState<ExampleDefinition[]>([]);
+  const [selectedExample, setSelectedExample] = useState<ExampleSelection>();
+  const [baselineJson, setBaselineJson] = useState("");
+  const [exampleLoading, setExampleLoading] = useState(true);
   const fileInput = useRef<HTMLInputElement>(null);
-  const revision = useRef(0);
+  const contentRevision = useRef(0);
+  const operationId = useRef(0);
+  const exampleLoadId = useRef(0);
   const request = useRef<AbortController | undefined>(undefined);
   const currentTemplate = useRef<File | undefined>(undefined);
   const currentJson = useRef(json);
   const copyTimer = useRef<number | undefined>(undefined);
 
-  useEffect(() => () => {
-    revision.current += 1;
-    request.current?.abort();
-    if (copyTimer.current) window.clearTimeout(copyTimer.current);
+  useEffect(() => {
+    let active = true;
+    const loadId = ++exampleLoadId.current;
+    const expectedRevision = contentRevision.current;
+    void (async () => {
+      try {
+        const response = await fetch("/examples.json");
+        if (!response.ok) throw new Error("The examples registry could not be loaded.");
+        const manifest = validateManifest(await response.json());
+        if (!active) return;
+        setExamples(manifest.examples);
+        if (exampleLoadId.current !== loadId || contentRevision.current !== expectedRevision) return;
+        const initial = manifest.examples.find(example => example.id === manifest.defaultExample)!;
+        await loadExample(initial, loadId, expectedRevision);
+      } catch (error) {
+        if (!active) return;
+        setExampleLoading(false);
+        setErrors(diagnostic("Examples unavailable", error instanceof Error ? error.message : "The examples registry could not be loaded."));
+        setActive("errors");
+      }
+    })();
+    return () => {
+      active = false;
+      operationId.current += 1;
+      exampleLoadId.current += 1;
+      request.current?.abort();
+      if (copyTimer.current) window.clearTimeout(copyTimer.current);
+    };
   }, []);
 
-  function invalidateResult(nextTab: Tab = "template") {
-    revision.current += 1;
+  function invalidateOperation(nextTab: Tab = "template") {
+    operationId.current += 1;
     request.current?.abort();
     request.current = undefined;
     setPending(undefined);
     setResult(undefined);
     setActive(current => current === "result" ? nextTab : current);
+  }
+
+  function commitContent(nextTab: Tab = "template") {
+    contentRevision.current += 1;
+    exampleLoadId.current += 1;
+    setExampleLoading(false);
+    invalidateOperation(nextTab);
+  }
+
+  async function loadExample(example: ExampleDefinition, loadId = ++exampleLoadId.current, expectedRevision = contentRevision.current) {
+    setExampleLoading(true);
+    try {
+      const [templateResponse, dataResponse] = await Promise.all([fetch(example.templatePath), fetch(example.dataPath)]);
+      if (!templateResponse.ok || !dataResponse.ok) throw new Error("The selected example assets could not be loaded.");
+      const [blob, data] = await Promise.all([templateResponse.blob(), dataResponse.text()]);
+      JSON.parse(data);
+      if (exampleLoadId.current !== loadId || contentRevision.current !== expectedRevision) return;
+      const file = new File([blob], filenameFromPath(example.templatePath), { type: blob.type || docxMime });
+      contentRevision.current += 1;
+      invalidateOperation("template");
+      currentTemplate.current = file;
+      currentJson.current = data;
+      setTemplate(file);
+      setJson(data);
+      setBaselineJson(data);
+      setSelectedExample(example.id);
+      setErrors([]);
+      setActive("template");
+    } catch (error) {
+      if (exampleLoadId.current !== loadId || contentRevision.current !== expectedRevision) return;
+      setErrors(diagnostic("Example could not be loaded", error instanceof SyntaxError ? "The example JSON data is malformed." : error instanceof Error ? error.message : "The selected example could not be loaded."));
+      setActive("errors");
+    } finally {
+      if (exampleLoadId.current === loadId) setExampleLoading(false);
+    }
+  }
+
+  function chooseExample(id: string) {
+    const example = examples.find(item => item.id === id);
+    if (!example) return;
+    if (id === selectedExample) {
+      if (exampleLoading) {
+        exampleLoadId.current += 1;
+        setExampleLoading(false);
+      }
+      return;
+    }
+    if ((selectedExample === "custom" || json !== baselineJson) && !window.confirm("Replace the current template and JSON with the selected example?")) return;
+    void loadExample(example);
   }
 
   function acceptTemplate(file: File) {
@@ -71,9 +185,10 @@ export default function App() {
       setActive("errors");
       return;
     }
-    invalidateResult("template");
+    commitContent("template");
     currentTemplate.current = file;
     setTemplate(file);
+    setSelectedExample("custom");
     setErrors([]);
     setActive("template");
   }
@@ -92,7 +207,7 @@ export default function App() {
   }
 
   function changeJson(value: string) {
-    invalidateResult("template");
+    commitContent("template");
     currentJson.current = value;
     setJson(value);
   }
@@ -129,29 +244,30 @@ export default function App() {
     try {
       JSON.parse(json);
     } catch {
-      invalidateResult("errors");
+      invalidateOperation("errors");
       setErrors(diagnostic("Invalid JSON", "Fix the JSON syntax before generating a document."));
       setActive("errors");
       return;
     }
 
-    invalidateResult("template");
-    const operation = revision.current;
+    invalidateOperation("template");
+    const operation = operationId.current;
+    const expectedRevision = contentRevision.current;
     const controller = new AbortController();
     request.current = controller;
     setErrors([]);
     setPending("generate");
     try {
       const generated = await generateDocument(template, json, controller.signal);
-      if (revision.current !== operation) return;
+      if (operationId.current !== operation || contentRevision.current !== expectedRevision) return;
       setResult(generated);
       setActive("result");
     } catch (error) {
-      if (revision.current !== operation || (error instanceof DOMException && error.name === "AbortError")) return;
+      if (operationId.current !== operation || contentRevision.current !== expectedRevision || (error instanceof DOMException && error.name === "AbortError")) return;
       setErrors(error instanceof GenerationFailure ? error.diagnostics : diagnostic("Generation failed", "The document could not be generated."));
       setActive("errors");
     } finally {
-      if (revision.current === operation) {
+      if (operationId.current === operation) {
         request.current = undefined;
         setPending(undefined);
       }
@@ -160,9 +276,9 @@ export default function App() {
 
   async function generateJson() {
     if (pending || !template) return;
-    revision.current += 1;
+    const operation = ++operationId.current;
     request.current?.abort();
-    const operation = revision.current;
+    const expectedRevision = contentRevision.current;
     const source = template;
     const controller = new AbortController();
     request.current = controller;
@@ -170,20 +286,20 @@ export default function App() {
     setPending("analyze");
     try {
       const analysis = await analyzeTemplate(source, controller.signal);
-      if (revision.current !== operation || currentTemplate.current !== source) return;
+      if (operationId.current !== operation || contentRevision.current !== expectedRevision || currentTemplate.current !== source) return;
       const proposed = fieldsToSampleJson(analysis.fields);
       const previous = currentJson.current;
       if (proposed === previous) return;
       if (previous.length > 0 && !window.confirm("Replace current JSON with generated example?")) return;
-      if (revision.current !== operation || currentTemplate.current !== source || currentJson.current !== previous) return;
+      if (operationId.current !== operation || contentRevision.current !== expectedRevision || currentTemplate.current !== source || currentJson.current !== previous) return;
       changeJson(proposed);
       setErrors([]);
     } catch (error) {
-      if (revision.current !== operation || (error instanceof DOMException && error.name === "AbortError")) return;
+      if (operationId.current !== operation || contentRevision.current !== expectedRevision || (error instanceof DOMException && error.name === "AbortError")) return;
       setErrors(error instanceof AnalysisFailure ? error.diagnostics : diagnostic("Analysis failed", "The template could not be analyzed."));
       setActive("errors");
     } finally {
-      if (revision.current === operation) {
+      if (operationId.current === operation) {
         request.current = undefined;
         setPending(undefined);
       }
@@ -191,22 +307,24 @@ export default function App() {
   }
 
   function clearTemplate() {
-    invalidateResult("template");
+    commitContent("template");
     currentTemplate.current = undefined;
     setTemplate(undefined);
+    setSelectedExample("custom");
     setErrors([]);
     setActive("template");
   }
 
-  function download() {
-    if (!result) return;
-    const url = URL.createObjectURL(result.blob);
+  function downloadBlob(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = result.filename;
+    anchor.download = filename;
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
+
+  const modified = selectedExample !== undefined && selectedExample !== "custom" && json !== baselineJson;
 
   const content = active === "errors" ? (
     errors.length ? <div className="issues"><div className="issues-title"><strong>{errors.length} {errors.length === 1 ? "error" : "errors"}</strong></div>{errors.map((error, index) => <div className="issue" key={`${error.code ?? error.title}-${index}`}><span>{index + 1}.</span><div><strong>{error.title}</strong><p>{[error.code, error.field, error.dataPath, error.location, error.formatter, error.detail].filter(Boolean).join(" · ")}</p></div></div>)}</div> : <DocumentEmpty>No errors</DocumentEmpty>
@@ -223,11 +341,9 @@ export default function App() {
         <section className="source" aria-label="Template and input data">
           <div className="filebar">
             <span className="label">Template</span>
-            <Button onClick={() => fileInput.current?.click()}>Select</Button>
             <span className="filename">{template?.name ?? "No file selected"}</span>
             {template && <Button type="text" className="clear" aria-label="Remove template" onClick={clearTemplate}>×</Button>}
             <Button type="primary" className="generate" aria-label="Generate document" loading={pending === "generate"} disabled={Boolean(pending)} onClick={() => void generate()}>Generate <span aria-hidden="true">→</span></Button>
-            <input ref={fileInput} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={selected} />
           </div>
           <div className="editbar">
             <div className="mode" aria-label="Input mode"><Button disabled>Form</Button><Button className="active" aria-current="true">JSON</Button></div>
@@ -244,9 +360,27 @@ export default function App() {
               <button className={active === "errors" ? "active" : ""} onClick={() => setActive("errors")}>Errors {errors.length > 0 && <span className="count">{errors.length}</span>}</button>
             </nav>
             <span className="spacer" />
-            {pending && <Spin size="small" aria-label={pending === "analyze" ? "Analyzing template" : "Generating document"} />}
-            <Button className="download" disabled={!result} onClick={download} icon={<DownloadIcon />}>Download</Button>
+            {(pending || exampleLoading) && <Spin size="small" aria-label={exampleLoading ? "Loading example" : pending === "analyze" ? "Analyzing template" : "Generating document"} />}
           </div>
+          {active === "template" && <div className="document-toolbar" aria-label="Template actions">
+            <div className="examples-control">
+              <label htmlFor="examples">Examples</label>
+              <select id="examples" value={selectedExample ?? ""} disabled={examples.length === 0} onChange={event => chooseExample(event.target.value)}>
+                {!selectedExample && <option value="">Loading…</option>}
+                {examples.map(example => <option value={example.id} key={example.id}>{example.title}</option>)}
+                {selectedExample === "custom" && <option value="custom" disabled>Custom</option>}
+              </select>
+              {modified && <span className="modified" aria-label="Example modified">Modified</span>}
+            </div>
+            <div className="document-actions">
+              <Button onClick={() => fileInput.current?.click()}>Upload</Button>
+              <Button className="download" aria-label="Download template" disabled={!template} onClick={() => template && downloadBlob(template, template.name)} icon={<DownloadIcon />}>Download</Button>
+              <input ref={fileInput} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={selected} />
+            </div>
+          </div>}
+          {active === "result" && <div className="document-toolbar result-toolbar" aria-label="Result actions">
+            <Button className="download" aria-label="Download result" disabled={!result} onClick={() => result && downloadBlob(result.blob, result.filename)} icon={<DownloadIcon />}>Download</Button>
+          </div>}
           <div
             className={`canvas ${active === "errors" && errors.length > 0 ? "errors-view" : ""} ${dragging ? "drop-target" : ""}`}
             onDragEnter={event => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
