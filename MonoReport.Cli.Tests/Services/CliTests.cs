@@ -243,6 +243,61 @@ namespace MonoReport.Tests.Services
         }
 
         [Fact]
+        public void Aggregated_generation_errors_preserve_existing_output_and_use_ordered_lines()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(directory);
+            var templatePath = Path.Combine(directory, "template.docx");
+            var outputPath = Path.Combine(directory, "output.docx");
+            var sentinel = Encoding.UTF8.GetBytes("existing output sentinel");
+            File.WriteAllBytes(templatePath, Docx.Create(
+                Docx.P(Docx.Field("MERGEFIELD Amount \\# \"0.00\"")),
+                Docx.P(Docx.Field("MERGEFIELD Date \\@ \"yyyy-MM-dd\""))));
+            File.WriteAllBytes(outputPath, sentinel);
+            try
+            {
+                using var output = new MemoryStream();
+                using var errors = new StringWriter();
+                var exit = CreateApplication().Run([CliArguments.Template, templatePath, CliArguments.Json,
+                    "{\"Amount\":\"bad\",\"Date\":\"bad\"}", CliArguments.Output, outputPath],
+                    Stream.Null, output, errors);
+
+                Assert.Equal(1, exit);
+                Assert.Empty(output.ToArray());
+                Assert.Equal(sentinel, File.ReadAllBytes(outputPath));
+                var lines = errors.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+                Assert.Equal(2, lines.Length);
+                Assert.Contains("field=Amount", lines[0]);
+                Assert.Contains("dataPath=Amount", lines[0]);
+                Assert.Contains("field=Date", lines[1]);
+            }
+            finally { Directory.Delete(directory, true); }
+        }
+
+        [Fact]
+        public void Generation_error_limit_prints_100_errors_and_one_informational_line()
+        {
+            var path = Path.GetTempFileName();
+            File.WriteAllBytes(path, Docx.Create(Enumerable.Range(0, 101)
+                .Select(_ => Docx.P(Docx.Field("MERGEFIELD Amount \\# \"0.00\""))).ToArray()));
+            try
+            {
+                using var output = new MemoryStream();
+                using var errors = new StringWriter();
+                var exit = CreateApplication().Run([CliArguments.Template, path, CliArguments.Json,
+                    "{\"Amount\":\"bad\"}"], Stream.Null, output, errors);
+
+                Assert.Equal(1, exit);
+                Assert.Empty(output.ToArray());
+                var lines = errors.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+                Assert.Equal(101, lines.Length);
+                Assert.All(lines[..100], line => Assert.StartsWith("generation.invalid_format:", line));
+                Assert.Equal("Maximum of 100 errors reached; further errors may exist.", lines[100]);
+            }
+            finally { File.Delete(path); }
+        }
+
+        [Fact]
         public void Invalid_json_does_not_truncate_existing_output()
         {
             var path = Path.GetTempFileName();

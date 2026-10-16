@@ -1,5 +1,7 @@
 namespace MonoReport.Api.Services;
 
+using MonoReport.Models;
+
 public sealed class ApiProblemFactory
 {
     public IResult Create(HttpContext context, int status, string code, string? field = null) => Results.Problem(
@@ -11,6 +13,20 @@ public sealed class ApiProblemFactory
         {
             ["code"] = code, ["traceId"] = context.TraceIdentifier, ["field"] = field
         });
+
+    public IResult Create(HttpContext context, TemplateException error)
+    {
+        var extensions = new Dictionary<string, object?>
+        {
+            ["code"] = error.Code,
+            ["traceId"] = context.TraceIdentifier,
+            ["field"] = error.Field,
+            ["errors"] = error.Errors,
+            ["limitReached"] = error.LimitReached
+        };
+        return Results.Problem(statusCode: 422, type: $"urn:monoreport:error:{error.Code}",
+            title: "Document generation failed", detail: SafeMessage(error.Code), extensions: extensions);
+    }
 
     public string SafeMessage(string code) => code switch
     {

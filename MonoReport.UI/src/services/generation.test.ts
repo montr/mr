@@ -29,7 +29,12 @@ describe("generation client", () => {
     expect(normalizeProblem({ title: "Document generation failed", detail: "Data is incompatible.", code: "generation.invalid_data", field: "Items" }, 422)).toEqual([
       { title: "Document generation failed", detail: "Data is incompatible.", code: "generation.invalid_data", field: "Items" }
     ]);
-    expect(normalizeProblem({ errors: [{ code: "one", message: "First" }, { code: "two", detail: "Second" }] }, 422)).toHaveLength(2);
+    const errors = normalizeProblem({ errors: [
+      { code: "one", message: "First", dataPath: "Items[0].Amount", location: "/word/document.xml, paragraph 1" },
+      { code: "two", detail: "Second" }
+    ] }, 422);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toMatchObject({ dataPath: "Items[0].Amount", location: "/word/document.xml, paragraph 1" });
   });
 
   it("uses safe fallbacks for malformed problems and unsafe filenames", async () => {

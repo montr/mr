@@ -240,6 +240,64 @@ public sealed class HttpApiTests
     }
 
     [Fact]
+    public async Task Generation_returns_ordered_errors_with_first_error_compatibility_and_data_paths()
+    {
+        using var factory = new WebApplicationFactory<Program>();
+        using var client = factory.CreateClient();
+        var template = Docx.Create(
+            Docx.P(Docx.Field("MERGEFIELD Amount \\# \"0.00\"")),
+            Docx.P(Docx.Field("MERGEFIELD Date \\@ \"yyyy-MM-dd\"")));
+        using var form = Form(template, "{\"Amount\":\"bad\",\"Date\":\"bad\"}");
+
+        using var response = await client.PostAsync("/api/documents/generate", form);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("generation.invalid_format", json.RootElement.GetProperty("code").GetString());
+        Assert.Equal("Amount", json.RootElement.GetProperty("field").GetString());
+        Assert.False(json.RootElement.GetProperty("limitReached").GetBoolean());
+        var errors = json.RootElement.GetProperty("errors").EnumerateArray().ToArray();
+        Assert.Equal(new[] { "Amount", "Date" }, errors.Select(item => item.GetProperty("field").GetString()));
+        Assert.Equal(new[] { "Amount", "Date" }, errors.Select(item => item.GetProperty("dataPath").GetString()));
+        Assert.All(errors, item => Assert.Equal("/word/document.xml", item.GetProperty("part").GetString()));
+    }
+
+    [Fact]
+    public async Task Generation_returns_all_structural_errors_without_rendering()
+    {
+        using var factory = new WebApplicationFactory<Program>();
+        using var client = factory.CreateClient();
+        using var form = Form(Docx.Create(
+            Docx.P(Docx.Field("MERGEFIELD")),
+            Docx.P(Docx.Field("MERGEFIELD"))), "{}");
+
+        using var response = await client.PostAsync("/api/documents/generate", form);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var errors = json.RootElement.GetProperty("errors").EnumerateArray().ToArray();
+        Assert.Equal(2, errors.Length);
+        Assert.All(errors, item => Assert.Equal("template.invalid_field_syntax", item.GetProperty("code").GetString()));
+    }
+
+    [Fact]
+    public async Task Generation_exposes_100_error_limit_without_a_101st_error()
+    {
+        using var factory = new WebApplicationFactory<Program>();
+        using var client = factory.CreateClient();
+        var template = Docx.Create(Enumerable.Range(0, 101)
+            .Select(_ => Docx.P(Docx.Field("MERGEFIELD Amount \\# \"0.00\""))).ToArray());
+        using var form = Form(template, "{\"Amount\":\"bad\"}");
+
+        using var response = await client.PostAsync("/api/documents/generate", form);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.True(json.RootElement.GetProperty("limitReached").GetBoolean());
+        Assert.Equal(100, json.RootElement.GetProperty("errors").GetArrayLength());
+    }
+
+    [Fact]
     public async Task Actual_warning_header_and_unexpected_failure_are_safe_and_recoverable()
     {
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.ConfigureServices(s => s.AddSingleton<GenerationOptionsFactory>(new TestOptions())));

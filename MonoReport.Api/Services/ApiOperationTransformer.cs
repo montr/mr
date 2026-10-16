@@ -68,10 +68,37 @@ public sealed class ApiOperationTransformer : IOpenApiOperationTransformer
                     {
                         ["type"] = new OpenApiSchema { Type = JsonSchemaType.String }, ["title"] = new OpenApiSchema { Type = JsonSchemaType.String },
                         ["status"] = new OpenApiSchema { Type = JsonSchemaType.Integer }, ["detail"] = new OpenApiSchema { Type = JsonSchemaType.String },
-                        ["code"] = new OpenApiSchema { Type = JsonSchemaType.String, Description = response.Description }, ["traceId"] = new OpenApiSchema { Type = JsonSchemaType.String }
+                        ["code"] = new OpenApiSchema { Type = JsonSchemaType.String, Description = response.Description }, ["traceId"] = new OpenApiSchema { Type = JsonSchemaType.String },
+                        ["field"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null }
                     }
                 } }
             };
+            if (generation && status == "422")
+            {
+                var schema = (OpenApiSchema)concrete.Content["application/problem+json"].Schema!;
+                schema.Required!.Add("errors");
+                schema.Required.Add("limitReached");
+                schema.Properties!["limitReached"] = new OpenApiSchema { Type = JsonSchemaType.Boolean };
+                schema.Properties["errors"] = new OpenApiSchema
+                {
+                    Type = JsonSchemaType.Array,
+                    Items = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.Object,
+                        Required = new HashSet<string> { "code", "message" },
+                        Properties = new Dictionary<string, IOpenApiSchema>
+                        {
+                            ["code"] = new OpenApiSchema { Type = JsonSchemaType.String },
+                            ["message"] = new OpenApiSchema { Type = JsonSchemaType.String },
+                            ["field"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null },
+                            ["part"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null },
+                            ["location"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null },
+                            ["formatter"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null },
+                            ["dataPath"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null }
+                        }
+                    }
+                };
+            }
         }
         return Task.CompletedTask;
     }

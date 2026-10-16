@@ -49,7 +49,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000`. The development server proxies relative `/api` requests to the local API. Set `MONOREPORT_API_URL` before `npm run dev` only when the API uses another local origin. Generate sends the selected template and JSON to document generation. Generate JSON explicitly analyzes the selected template and creates an editable example with empty string values and one example item per collection; it confirms before replacing nonempty editor content. The UI has no persistence, analytics, or alternate generation backend.
+Open `http://localhost:3000`. The development server proxies relative `/api` requests to the local API. Set `MONOREPORT_API_URL` before `npm run dev` only when the API uses another local origin. Generate sends the selected template and JSON to document generation. Generate JSON explicitly analyzes the selected template and creates an editable example with `1234.5` for recognized numeric or SpellOut fields, an ISO 8601 value for recognized date fields, empty strings for other scalars, and one example item per collection. This is a best-effort editing aid, not validation. It confirms before replacing nonempty editor content. The UI has no persistence, analytics, or alternate generation backend.
 
 Run the focused frontend checks from `MonoReport.UI`:
 
@@ -125,7 +125,7 @@ public sealed class DocumentService(MergeEngine engine)
 }
 ```
 
-`MergeEngine.Merge` reads a stream from its current position without modifying or closing it. The caller owns both input objects. It processes the main document, headers, footers, footnotes, and endnotes. Template and formatting errors throw `TemplateException`, with field, code, and document-location details where available.
+`MergeEngine.Merge` reads a stream from its current position without modifying or closing it. The caller owns both input objects. It processes the main document, headers, footers, footnotes, and endnotes. Template and recoverable generation errors throw `TemplateException`. Its established properties describe the first error; `Errors` contains the ordered diagnostics and `LimitReached` reports that the maximum of 100 errors was recorded. Reaching 100 stops processing immediately without probing for another error. An unsuccessful merge returns no partial document.
 
 ### Template analysis
 
@@ -178,7 +178,7 @@ curl --fail-with-body http://127.0.0.1:5080/api/documents/analyze \
 
 ### Error contracts
 
-HTTP application errors use RFC 9457 `application/problem+json`: `type`, `title`, `status`, safe `detail`, machine-readable `code`, and `traceId`; optional safe field context may appear. They never return exception stacks, server paths, raw field instructions, input data, or partial generated documents. Stable code identity is independent of message wording.
+HTTP application errors use RFC 9457 `application/problem+json`: `type`, `title`, `status`, safe `detail`, machine-readable `code`, and `traceId`; optional safe field context may appear. Generation 422 responses retain the first error in the top-level properties and add ordered `errors` plus `limitReached`. Each error can include `field`, package `part`, template `location`, `formatter`, and an indexed JSON `dataPath`. They never return exception stacks, server paths, raw field instructions, input data, or partial generated documents. Stable code identity is independent of message wording.
 
 1. Both endpoints, HTTP 400: missing, empty, duplicate, wrongly represented inputs use `request.missing_input`, `request.empty_input`, `request.duplicate_input`, `request.invalid_input`; malformed multipart or missing boundary uses `request.invalid_multipart`. Analysis extra inputs use `request.unexpected_input`.
 2. Both endpoints, HTTP 413: `request.too_large`. HTTP 415: `request.unsupported_media_type` for an overall media type other than multipart/form-data.
@@ -235,7 +235,7 @@ Simple and complex Word fields are supported, including split instructions and c
 3. `\@` applies a .NET date format, such as `dd MMM yyyy`; use ISO 8601 dates in JSON.
 4. Switches may be combined and run in their specified order. The complete historical Word picture-format grammar is not implemented.
 
-JSON property names are case-sensitive; dotted paths resolve nested properties. JSON `null` produces empty text. Objects and arrays cannot be inserted as scalar values. Missing fields are empty by default; warning and error policies are available. The default numeric/date culture is invariant.
+JSON property names are case-sensitive; dotted paths resolve nested properties. Missing scalar values, JSON `null`, and `""` produce empty text without running value-dependent formatters; formatter names and Word switches are still validated. Objects and arrays cannot be inserted as scalar values. Missing fields are empty by default; warning and error policies are available. The default numeric/date culture is invariant.
 
 This optional block goes inside `SaveEstimate`, after the JSON is read. Its `documents` parameter and `json` local variable come from that method. `Generate` opens a fresh template for each call:
 
@@ -269,7 +269,7 @@ Material                            | Quantity | Unit price
 {"Items":[{"Name":"Portland cement (25 kg bag)","Quantity":100,"Price":500},{"Name":"Concrete blocks (440 x 215 x 100 mm)","Quantity":250,"Price":261.722}]}
 ```
 
-1. The engine repeats the region for each item; an empty array produces no data rows. It removes markers and rows or paragraphs containing only markers, while retaining ordinary fields and the outside header.
+1. The engine repeats the region for each item; an empty array, missing value, JSON `null`, or `""` produces no data rows, subject to the configured missing-property policy. Other non-array values are errors. It removes markers and rows or paragraphs containing only markers, while retaining ordinary fields and the outside header.
 2. Inside a region, use paths relative to the current item, such as `Name`, not `Items.Name`. There is no implicit lookup in the parent object. Nested collections restore the enclosing item's context when the inner region ends.
 3. Put boundaries in rows of the same table or paragraphs sharing a parent. Both markers may surround fields in one data row. For nested regions, use separate boundary rows or paragraphs. Ranges across tables or document parts are unsupported.
 4. Independent regions must have separate, nonoverlapping paragraph or row ranges. Shared blocks, including overlaps through nested tables, are rejected; genuine parent/child regions are supported.
@@ -337,7 +337,7 @@ Remove `artifacts` when the isolated package and installation are no longer need
 3. Choose one JSON source: `--json '<JSON>'`, `--json-file <path>`, or `--stdin`. File input is UTF-8; quote inline JSON for your shell. With no source option, the CLI reads stdin until EOF.
 4. `--culture <culture>` selects numeric/date culture, such as `en-GB`; the default is invariant.
 5. `--help` / `-h` shows help.
-6. Exit codes are `0` for success, `1` for input/render/output errors, and `2` for invalid arguments. Diagnostics go to stderr; generation stdout contains only DOCX bytes.
+6. Exit codes are `0` for success, `1` for input/render/output errors, and `2` for invalid arguments. Generation errors go to stderr in deterministic order, one line per error with indexed data paths when available. At the 100-error limit an additional informational line is printed. Failed generation writes no DOCX to stdout and does not create or replace the requested output file.
 
 ### CLI template analysis
 

@@ -36,7 +36,7 @@ app.Use(async (context, next) =>
     }
     catch (RequestInputException error) { await problems.Create(context, error.Status, error.Code, error.Field).ExecuteAsync(context); }
     catch (BadHttpRequestException error) { await problems.Create(context, error.StatusCode == 413 ? 413 : 400, error.StatusCode == 413 ? "request.too_large" : "request.invalid_multipart").ExecuteAsync(context); }
-    catch (TemplateException error) { await problems.Create(context, 422, error.Code, error.Field).ExecuteAsync(context); }
+    catch (TemplateException error) { await problems.Create(context, error).ExecuteAsync(context); }
     catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { }
     catch (Exception error)
     {

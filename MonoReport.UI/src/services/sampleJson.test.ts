@@ -42,4 +42,13 @@ describe("sample JSON conversion", () => {
   it("returns an empty object for no fields", () => {
     expect(fieldsToSampleJson([])).toBe("{}");
   });
+
+  it("uses the first recognized numeric, SpellOut, or date format as a plausible sample", () => {
+    expect(JSON.parse(fieldsToSampleJson([
+      scalar("Amount", [[{ kind: "general", value: "Upper" }], [{ kind: "number", value: "0.00" }]]),
+      scalar("Words", [[{ kind: "general", value: "SpellOut" }]]),
+      scalar("Date", [[{ kind: "date", value: "yyyy-MM-dd" }]]),
+      scalar("Conflict", [[{ kind: "date", value: "yyyy" }], [{ kind: "number", value: "0" }]])
+    ]))).toEqual({ Amount: 1234.5, Words: 1234.5, Date: "2026-01-15T00:00:00Z", Conflict: "2026-01-15T00:00:00Z" });
+  });
 });

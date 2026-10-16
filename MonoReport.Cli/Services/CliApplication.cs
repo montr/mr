@@ -89,8 +89,31 @@ namespace MonoReport.Cli.Services
 
                 return 0;
             }
+            catch (TemplateException error)
+            {
+                if (error.Errors.Count == 1 && error.Code.StartsWith("template.", StringComparison.Ordinal))
+                {
+                    diagnostics.WriteLine(error.Message);
+                    return 1;
+                }
+                foreach (var item in error.Errors)
+                {
+                    var context = new[]
+                    {
+                        item.Field is null ? null : $"field={item.Field}",
+                        item.DataPath is null ? null : $"dataPath={item.DataPath}",
+                        item.Location is null ? null : $"location={item.Location}",
+                        item.Formatter is null ? null : $"formatter={item.Formatter}"
+                    }.Where(value => value is not null);
+                    var suffix = string.Join(", ", context!);
+                    diagnostics.WriteLine($"{item.Code}: {item.Message}{(suffix.Length == 0 ? string.Empty : $" ({suffix})")}");
+                }
+                if (error.LimitReached)
+                    diagnostics.WriteLine("Maximum of 100 errors reached; further errors may exist.");
+                return 1;
+            }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException
-                or TemplateException or OpenXmlPackageException or ArgumentException or InvalidOperationException)
+                or OpenXmlPackageException or ArgumentException or InvalidOperationException)
             {
                 diagnostics.WriteLine(error.Message);
                 return 1;

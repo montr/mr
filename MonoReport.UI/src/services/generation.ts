@@ -17,11 +17,19 @@ function issue(value: unknown, fallbackTitle: string): Diagnostic | undefined {
   const item = value as Record<string, unknown>;
   const detail = text(item.detail) ?? text(item.message);
   if (!detail) return undefined;
+  const part = text(item.part);
+  const location = text(item.location);
+  const formatter = text(item.formatter);
+  const dataPath = text(item.dataPath);
   return {
     title: text(item.title) ?? text(item.code) ?? fallbackTitle,
     detail,
     code: text(item.code),
-    field: text(item.field)
+    field: text(item.field),
+    ...(part ? { part } : {}),
+    ...(location ? { location } : {}),
+    ...(formatter ? { formatter } : {}),
+    ...(dataPath ? { dataPath } : {})
   };
 }
 

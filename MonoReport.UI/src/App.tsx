@@ -209,7 +209,7 @@ export default function App() {
   }
 
   const content = active === "errors" ? (
-    errors.length ? <div className="issues"><div className="issues-title"><strong>{errors.length} {errors.length === 1 ? "error" : "errors"}</strong></div>{errors.map((error, index) => <div className="issue" key={`${error.code ?? error.title}-${index}`}><span>{index + 1}.</span><div><strong>{error.title}</strong><p>{[error.code, error.field, error.detail].filter(Boolean).join(" · ")}</p></div></div>)}</div> : <DocumentEmpty>No errors</DocumentEmpty>
+    errors.length ? <div className="issues"><div className="issues-title"><strong>{errors.length} {errors.length === 1 ? "error" : "errors"}</strong></div>{errors.map((error, index) => <div className="issue" key={`${error.code ?? error.title}-${index}`}><span>{index + 1}.</span><div><strong>{error.title}</strong><p>{[error.code, error.field, error.dataPath, error.location, error.formatter, error.detail].filter(Boolean).join(" · ")}</p></div></div>)}</div> : <DocumentEmpty>No errors</DocumentEmpty>
   ) : active === "result" && result ? (
     <DocxPreview source={result.blob} label="Result" />
   ) : template ? (

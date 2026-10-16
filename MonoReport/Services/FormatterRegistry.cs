@@ -15,12 +15,17 @@ namespace MonoReport.Services
 
         public string Format(JsonElement value, string name, CultureInfo culture, IReadOnlyDictionary<string, string>? options = null)
         {
-            if (_formatters.TryGetValue(name, out var formatter) == false)
-            {
-                throw new MonoReport.Models.UnknownFormatterException($"Unknown formatter: {name}");
-            }
+            var formatter = Get(name);
 
             return formatter.Format(value, culture, options ?? new Dictionary<string, string>());
+        }
+
+        internal void Validate(string name) => Get(name);
+
+        private IValueFormatter Get(string name)
+        {
+            if (_formatters.TryGetValue(name, out var formatter)) return formatter;
+            throw new MonoReport.Models.UnknownFormatterException($"Unknown formatter: {name}");
         }
     }
 }

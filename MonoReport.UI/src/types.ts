@@ -3,6 +3,10 @@ export interface Diagnostic {
   detail: string;
   code?: string;
   field?: string;
+  part?: string;
+  location?: string;
+  formatter?: string;
+  dataPath?: string;
 }
 
 export interface GeneratedDocument {

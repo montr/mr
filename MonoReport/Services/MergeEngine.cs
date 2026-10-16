@@ -30,17 +30,26 @@ namespace MonoReport.Services
                 using (var document = _storyReader.Open(output, true))
                 {
                     var analysis = _analyzer.Inspect(document);
-                    var error = analysis.Diagnostics.FirstOrDefault();
-                    if (error is not null) throw error.ToException();
+                    if (analysis.Diagnostics.Count != 0)
+                    {
+                        var structural = analysis.Diagnostics.Take(MergeContext.ErrorLimit).ToArray();
+                        var first = structural[0].ToException();
+                        throw new TemplateException(first,
+                            structural.Select(error => TemplateException.ToDiagnostic(error.ToException(), null)),
+                            structural.Length == MergeContext.ErrorLimit);
+                    }
                     foreach (var story in analysis.Stories)
                     {
-                        _renderer.Render(story.Xml.Root!, story.Part.Uri.ToString(), context,
-                            story.Fields, story.Regions);
+                        if (!_renderer.Render(story.Xml.Root!, story.Part.Uri.ToString(), context,
+                            story.Fields, story.Regions)) break;
                         using (var target = story.Part.GetStream(FileMode.Create, FileAccess.Write))
                         {
                             story.Xml.Save(target, SaveOptions.DisableFormatting);
                         }
                     }
+
+                    if (context.Errors.Count != 0)
+                        throw new TemplateException(context.FirstError!, context.Errors, context.LimitReached);
                 }
 
                 return new(output.ToArray(), context.Warnings.AsReadOnly());

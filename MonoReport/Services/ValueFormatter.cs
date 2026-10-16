@@ -18,7 +18,8 @@ namespace MonoReport.Services
 
             try
             {
-                var empty = value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined;
+                var empty = value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
+                    || value.ValueKind == JsonValueKind.String && value.GetString() == string.Empty;
                 var text = empty ? string.Empty : value.ValueKind switch
                 {
                     JsonValueKind.String => value.GetString()!,
@@ -31,10 +32,8 @@ namespace MonoReport.Services
                 if (binding is not null)
                 {
                     active = binding.Name;
-                    if (empty == false)
-                    {
-                        text = _formatters.Format(value, binding.Name, options.Culture, binding.Options);
-                    }
+                    if (empty) _formatters.Validate(binding.Name);
+                    else text = _formatters.Format(value, binding.Name, options.Culture, binding.Options);
                 }
 
                 foreach (var item in field.Switches)
@@ -51,23 +50,18 @@ namespace MonoReport.Services
                                 WordFieldCodes.CapsFormat => Regex.Replace(text, WordInitialLetterPattern, m => options.Culture.TextInfo.ToUpper(m.Value)),
                                 WordFieldCodes.FirstCapFormat => FirstCap(text, options.Culture),
                                 WordFieldCodes.MergeFormat => text,
-                                WordFieldCodes.SpellOutFormat => empty ? string.Empty
-                                    : _formatters.Format(value, RubSpellOutFormatter.FormatterName, options.Culture),
+                                WordFieldCodes.SpellOutFormat => SpellOut(value, options, empty),
                                 _ => throw new FormatException($"Unsupported Word formatting switch: {item.Argument}")
                             };
                             break;
                         case WordFieldCodes.NumberFormatSwitch:
-                            if (empty == false)
-                            {
-                                text = decimal.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture).ToString(item.Argument, options.Culture);
-                            }
+                            if (empty) _ = 0m.ToString(item.Argument, options.Culture);
+                            else text = decimal.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture).ToString(item.Argument, options.Culture);
 
                             break;
                         case WordFieldCodes.DateFormatSwitch:
-                            if (empty == false)
-                            {
-                                text = DateTimeOffset.Parse(text, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces).ToString(item.Argument, options.Culture);
-                            }
+                            if (empty) _ = DateTimeOffset.UnixEpoch.ToString(item.Argument, options.Culture);
+                            else text = DateTimeOffset.Parse(text, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces).ToString(item.Argument, options.Culture);
 
                             break;
                         default:
@@ -84,6 +78,17 @@ namespace MonoReport.Services
                     : "generation.invalid_format";
                 throw new TemplateException($"Cannot format field '{field.Name}' using '{active}'. Field code: {field.Code}. {ex.Message}", field.Name, field.Code, location, active, ex, code);
             }
+        }
+
+        private string SpellOut(JsonElement value, MergeOptions options, bool empty)
+        {
+            if (empty)
+            {
+                _formatters.Validate(RubSpellOutFormatter.FormatterName);
+                return string.Empty;
+            }
+
+            return _formatters.Format(value, RubSpellOutFormatter.FormatterName, options.Culture);
         }
 
         private static string FirstCap(string text, CultureInfo culture)

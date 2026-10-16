@@ -118,13 +118,14 @@ describe("MonoReport playground", () => {
 
   it("renders real API diagnostics and multiple issues without mock content", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ errors: [{ code: "first", message: "First issue" }, { code: "second", detail: "Second issue" }] }), { status: 422, headers: { "Content-Type": "application/problem+json" } })));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ errors: [{ code: "first", message: "First issue", dataPath: "Items[3].Amount", location: "/word/document.xml, paragraph 2" }, { code: "second", detail: "Second issue" }] }), { status: 422, headers: { "Content-Type": "application/problem+json" } })));
     render(<App />);
     await selectTemplate(user);
     await user.click(screen.getByRole("button", { name: "Generate document" }));
     expect(await screen.findByText("2 errors")).toBeInTheDocument();
     expect(screen.getByText(/First issue/)).toBeInTheDocument();
     expect(screen.getByText(/Second issue/)).toBeInTheDocument();
+    expect(screen.getByText(/Items\[3\]\.Amount/)).toBeInTheDocument();
     expect(screen.queryByText("Unmatched collection region")).not.toBeInTheDocument();
   });
 

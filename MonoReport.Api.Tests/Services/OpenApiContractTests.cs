@@ -36,6 +36,11 @@ public sealed class OpenApiContractTests
             {
                 Assert.Equal("binary", responses.GetProperty("200").GetProperty("content").GetProperty("application/vnd.openxmlformats-officedocument.wordprocessingml.document").GetProperty("schema").GetProperty("format").GetString());
                 Assert.Contains("only", responses.GetProperty("200").GetProperty("headers").GetProperty("X-MonoReport-Warning-Count").GetProperty("description").GetString());
+                var generationProblem = responses.GetProperty("422").GetProperty("content").GetProperty("application/problem+json").GetProperty("schema");
+                Assert.True(generationProblem.GetProperty("properties").TryGetProperty("errors", out var errors));
+                Assert.True(generationProblem.GetProperty("properties").TryGetProperty("limitReached", out _));
+                foreach (var key in new[] { "code", "message", "field", "part", "location", "formatter", "dataPath" })
+                    Assert.True(errors.GetProperty("items").GetProperty("properties").TryGetProperty(key, out _));
             }
             else Assert.True(responses.GetProperty("200").GetProperty("content").TryGetProperty("application/json", out _));
         }
