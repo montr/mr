@@ -1,121 +1,21 @@
-
 # Product Backlog
 
-Future capabilities identified during the initial MonoReport specification and subsequent development.
+Potential work for MonoReport. Items are not approved Features; scope and priorities require Product Owner approval.
 
-The product architecture principles below record approved product direction. Planned capabilities are not approved Feature Specs; their detailed scope, priority, and implementation require Product Owner approval through the Development Workflow.
+## Product Direction
 
-## Product Architecture — Multiple Document Formats
+1. **XLSX support** — Excel templates and generation; preserve formulas, styles, and workbook structure. Reuse DOCX components only where appropriate.
+2. **Conditional rendering** — conditions in templates without arbitrary code execution or business calculations.
+3. **Word Add-in** — visual template authoring with field and collection insertion. Define how data sources and server connections work first.
+4. **Extended formatting** — additional field formats and currency support.
+5. **MCP integration** — revisit when concrete consumers and use cases are identified.
 
-1. MonoReport is intended to support multiple document formats, not only DOCX.
-2. Microsoft Word (DOCX) and Microsoft Excel (XLSX) are target formats; XLSX support is planned, not implemented.
-3. Design shared components and public contracts with future XLSX support in mind.
-4. Keep format-specific parsing, template processing, and rendering isolated.
-5. Reuse common functionality where appropriate, including data resolution and formatting.
-6. Do not assume DOCX and XLSX must use identical template syntax.
-7. Avoid premature abstractions or refactoring the existing DOCX engine solely for future Excel support. Implementation of additional formats requires an approved Feature.
+## Engineering Backlog
 
-## Planned Capabilities
-
-### Playground Examples
-
-Status: Completed as Feature 009 and accepted by the Product Owner on 2026-10-16. Scope and acceptance evidence are governed by `.docs/features/009-playground-examples/feature-spec.md` and `.docs/features/009-playground-examples/review.md`.
-
-1. Provide a static JSON manifest describing demo examples by ID, title, document format, template path, and sample data path, with an explicit default example.
-2. On opening MonoReport Playground, automatically load the default example template and JSON, and show its template preview. Generate a result only when the user clicks Generate.
-3. Provide a compact example selector, supporting multiple examples without introducing a separate demo mode.
-4. Bundle example assets with the UI as local static resources; do not require GitHub access or a new server endpoint at runtime. Keep the canonical sample files in one location where practical.
-5. Preserve user edits during asynchronous loading; require confirmation before switching examples when the current template or JSON has unsaved changes. Clearing a template must not automatically reload the default example.
-6. Include a document-format identifier in the manifest to support DOCX now and XLSX examples later, without implementing XLSX generation or preview in this Feature.
-7. Keep the catalog independent of the document-generation engine; avoid speculative multi-format abstractions, search, tags, categories, or other catalog infrastructure.
-
-### Excel Template Engine
-
-Status: Planned, not implemented. Detailed scope requires a future approved Feature Spec.
-
-1. Generate XLSX workbooks from templates and structured data.
-2. Evaluate Excel-native approaches to fields, repeated regions, and formatting.
-3. Preserve workbook structure, formulas, styles, and other relevant Excel features.
-4. Reuse suitable shared components without tightly coupling XLSX to DOCX.
-5. Define detailed behavior and acceptance criteria in a future Feature Spec.
-
-### Conditional Rendering
-
-Support conditional blocks in document templates, including boolean values, missing values, and comparisons.
-
-Constraints:
-1. Do not execute arbitrary code from templates.
-2. Keep business calculations outside the template engine.
-
-### HTTP API
-
-Provide an ASP.NET Core API for rendering documents from templates and JSON data.
-
-Constraints:
-1. Keep the core engine independent of the HTTP layer.
-2. Define the API contract when the feature is planned.
-3. Provide an OpenAPI specification for all public HTTP endpoints.
-4. Document request and response schemas, authentication where applicable, errors, and supported document formats.
-5. Provide interactive API documentation through Swagger UI or an equivalent OpenAPI-compatible interface.
-6. Prefer generating OpenAPI documentation from actual API contracts.
-7. Verify that documentation remains consistent with the implemented API.
-8. Design the API contract to accommodate DOCX and future XLSX without unnecessary breaking changes.
-
-Status: Selected for Feature 003. Detailed scope is governed by the Feature 003 specification and approval workflow.
-
-### MCP Server
-
-Provide a future MCP server integration for MonoReport.
-
-1. Evaluate whether the MCP server should call MonoReport Core directly or use the HTTP API based on deployment, authorization, and operational requirements.
-2. Keep the MCP server outside Feature 003.
-3. Define its detailed scope, security model, transport, and deployment architecture in a future Feature Spec.
-
-Status: Planned, not implemented. Detailed scope requires a future approved Feature Spec.
-
-### Word Add-in
-
-Provide a Microsoft Word Add-in for creating and editing templates.
-
-Capabilities:
-1. Browse available data fields and collections.
-2. Insert MERGEFIELD fields.
-3. Configure field formatting.
-4. Insert and manage collection regions.
-5. Hide technical field-code details from template authors.
-
-### Extended Formatting
-
-Extend the formatter system with additional formatting capabilities and currency support.
-
-Exact formatter names, currencies, and behavior are to be defined in future Feature Specs.
-
-### Additional Output Formats
-
-Explore HTML and PDF generation as potential future extensions.
-
-This is exploratory and is not part of the currently approved engine scope.
-
-## Backlog Management
-
-1. Do not assign feature IDs to backlog items.
-2. Do not treat backlog items as approved requirements.
-3. When the Product Owner selects an item for implementation, create the next sequential Feature directory and follow the Development Workflow in AGENTS.md.
-4. Preserve the original backlog entry or link it to the resulting Feature.
-5. Add newly identified future capabilities here only with Product Owner approval.
-
-
-## Technical Improvements
-
-### C# Code Style and Automated Formatting
-
-Establish consistent, readable C# code formatting across the project.
-
-1. Review the previously established coding conventions.
-2. Define formatting rules in `.editorconfig`.
-3. Evaluate `dotnet format`, Roslyn analyzers, and additional tooling for rules not supported by standard formatting.
-4. Configure Codex to follow and verify the agreed conventions.
-5. Prevent unrelated mass-formatting changes in feature branches.
-6. Validate the configuration against representative existing source files before applying it project-wide.
-
-Status: Deferred. Requires Product Owner approval before implementation.
+1. **Release automation** — GitHub Releases and automatic release notes from commits.
+2. **UI polish** — fix remaining minor visual issues, after confirming they still exist.
+3. **Ant Design review** — consistent and appropriate use of components.
+4. **Dependency audit** — review current npm audit findings.
+5. **C# formatting and code style** — establish and automate consistent rules.
+6. **UI performance** — measure bundle size and loading before optimizing.
+7. **API documentation** — verify OpenAPI and interactive documentation coverage; address confirmed gaps only.
