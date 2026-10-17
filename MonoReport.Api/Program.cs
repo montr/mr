@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using MonoReport.Api.Services;
 using MonoReport.Models;
 
@@ -10,6 +11,12 @@ builder.Services.Configure<FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = requestLimit;
     options.ValueLengthLimit = (int)requestLimit;
+});
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 builder.Services.AddMonoReport();
 builder.Services.AddTransient<MultipartRequestReader>();
@@ -23,6 +30,7 @@ builder.Services.AddOpenApi(options =>
     options.AddSchemaTransformer<ValidationSchemaTransformer>();
 });
 var app = builder.Build();
+app.UseForwardedHeaders();
 app.Use(async (context, next) =>
 {
     var problems = context.RequestServices.GetRequiredService<ApiProblemFactory>();

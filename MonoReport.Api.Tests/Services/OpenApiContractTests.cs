@@ -7,6 +7,26 @@ namespace MonoReport.Tests.Services;
 
 public sealed class OpenApiContractTests
 {
+    [Theory]
+    [InlineData(null, "http://monoreport.test/")]
+    [InlineData("https", "https://monoreport.test/")]
+    public async Task Generated_contract_uses_the_public_scheme_for_every_operation(string? forwardedScheme, string expectedServer)
+    {
+        using var factory = new WebApplicationFactory<Program>();
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/openapi/v1.json");
+        request.Headers.Host = "monoreport.test";
+        if (forwardedScheme is not null) request.Headers.Add("X-Forwarded-Proto", forwardedScheme);
+
+        using var response = await client.SendAsync(request); response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        Assert.Equal(expectedServer, root.GetProperty("servers")[0].GetProperty("url").GetString());
+        Assert.Equal(
+            new[] { "/api/documents/analyze", "/api/documents/generate" },
+            root.GetProperty("paths").EnumerateObject().Select(path => path.Name).Order().ToArray());
+    }
+
     [Fact]
     public async Task Generated_contract_has_accurate_multipart_binary_json_errors_and_context()
     {
